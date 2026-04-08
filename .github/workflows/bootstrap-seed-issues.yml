@@ -59,17 +59,18 @@ jobs:
                   reviewer1 = (yml.match(/^reviewer_1:\s*(.+)$/m) || [])[1] || reviewer1;
                 }
 
-                const body =
-`**Manuscript:** ${name}
-**DOI:** ${doi}
-**First reviewer:** @${reviewer1}
-**Folder:** \`${folder}\`
-
-This item was seeded into the queue from existing files.
-
-A second reviewer (anyone except @${reviewer1}) can claim it by commenting \`/checkout\` below.
-
-<!-- folder: ${folder} -->`;
+                const body = [
+                  `**Manuscript:** ${name}`,
+                  `**DOI:** ${doi}`,
+                  `**First reviewer:** @${reviewer1}`,
+                  '**Folder:** `' + folder + '`',
+                  '',
+                  'This item was seeded into the queue from existing files.',
+                  '',
+                  `A second reviewer (anyone except @${reviewer1}) can claim it by commenting \`/checkout\` below.`,
+                  '',
+                  `<!-- folder: ${folder} -->`,
+                ].join('\n');
 
                 const created = await github.rest.issues.create({
                   ...context.repo,
