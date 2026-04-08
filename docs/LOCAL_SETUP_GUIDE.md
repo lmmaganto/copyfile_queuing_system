@@ -1,541 +1,738 @@
-# Local Setup Guide: SDE Manuscript Review Queue
+# Local Setup Guide: Getting Started with the Review Queue
 
-This guide walks you through setting up the review queue repository on your local machine and working with it in Visual Studio Code (VS Code).
+This guide walks you through setting up this repository on your local computer and working with it in Visual Studio Code. **No prior experience with Git, GitHub, or VS Code is required** — we'll explain everything step by step.
 
 ---
 
 ## Table of Contents
 
-1. [Prerequisites](#prerequisites)
-2. [Cloning the Repository](#cloning-the-repository)
-3. [Repository Structure](#repository-structure)
-4. [Setting Up Your Environment](#setting-up-your-environment)
-5. [Opening in VS Code](#opening-in-vs-code)
-6. [Working Without GitHub Copilot](#working-without-github-copilot)
-7. [Working With GitHub Copilot](#working-with-github-copilot)
-8. [Common Workflows](#common-workflows)
-9. [Troubleshooting](#troubleshooting)
+1. [What You'll Install](#what-youll-install)
+2. [Step 1: Install Required Software](#step-1-install-required-software)
+3. [Step 2: Get Access to the Repository](#step-2-get-access-to-the-repository)
+4. [Step 3: Clone the Repository](#step-3-clone-the-repository)
+5. [Step 4: Set Up Your Python Environment](#step-4-set-up-your-python-environment)
+6. [Step 5: Open in VS Code](#step-5-open-in-vs-code)
+7. [Understanding the Repository](#understanding-the-repository)
+8. [Optional: GitHub Copilot](#optional-github-copilot)
+9. [Daily Workflow](#daily-workflow)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
-## Prerequisites
+## What You'll Install
 
-Before you begin, make sure you have the following installed:
+You need four things on your computer:
 
-- **Git** - [Download Git](https://git-scm.com/downloads)
-- **Visual Studio Code** - [Download VS Code](https://code.visualstudio.com/)
-- **Python 3.x** (via Anaconda/Miniconda recommended) - [Download Miniconda](https://docs.conda.io/en/latest/miniconda.html)
-- **GitHub Account** with access to the repository (must be added as a collaborator)
+1. **Git** - Software that tracks changes to files
+2. **Visual Studio Code (VS Code)** - A text/code editor (like fancy Notepad)
+3. **Python** - Programming language needed for Jupyter notebooks
+4. **GitHub Account** - Your online identity for collaborating
 
-### Recommended VS Code Extensions
-
-- Python (Microsoft)
-- Jupyter (Microsoft)
-- GitHub Pull Requests and Issues (GitHub)
-- GitLens (optional, but helpful for Git visualization)
-- **GitHub Copilot** (optional - requires subscription)
-- **GitHub Copilot Chat** (optional - requires Copilot subscription)
+Don't worry if you don't know what these are — we'll install and set up everything together.
 
 ---
 
-## Cloning the Repository
+## Step 1: Install Required Software
 
-### Option 1: Using Git Command Line
+### 1.1: Install Git
 
-1. **Open a terminal** (PowerShell, Command Prompt, or Git Bash)
+Git is a tool that helps you download and sync files from GitHub.
 
-2. **Navigate to where you want to store the repository:**
-   ```bash
-   cd C:\Users\YourUsername\Documents
+**Windows:**
+1. Go to [https://git-scm.com/downloads](https://git-scm.com/downloads)
+2. Click **"Download for Windows"**
+3. Run the downloaded installer
+4. **Important:** During installation, when asked about default editor, select **"Use Visual Studio Code as Git's default editor"**
+5. For all other options, accept the defaults (just keep clicking "Next")
+6. Click "Install" and then "Finish"
+
+**To verify it installed:**
+1. Open PowerShell (search "PowerShell" in Windows Start menu)
+2. Type: `git --version`
+3. You should see something like `git version 2.x.x`
+
+### 1.2: Install Visual Studio Code
+
+VS Code is where you'll view and edit files.
+
+1. Go to [https://code.visualstudio.com/](https://code.visualstudio.com/)
+2. Click the big **"Download for Windows"** button
+3. Run the installer
+4. **Important:** Check the box that says **"Add to PATH"** during installation
+5. Accept all other defaults
+6. Click "Install"
+
+### 1.3: Install Python (via Miniconda)
+
+Python is needed to run Jupyter notebooks. We'll use Miniconda, which is a lightweight Python installer.
+
+1. Go to [https://docs.conda.io/en/latest/miniconda.html](https://docs.conda.io/en/latest/miniconda.html)
+2. Under Windows installers, download **Miniconda3 Windows 64-bit**
+3. Run the installer
+4. **Important:** Check **"Add Miniconda3 to my PATH environment variable"** (even if it says "Not recommended")
+5. Accept all other defaults
+6. Click "Install"
+
+**To verify it installed:**
+1. **Close and reopen PowerShell** (important!)
+2. Type: `conda --version`
+3. You should see something like `conda 24.x.x`
+
+### 1.4: Create a GitHub Account
+
+If you don't have a GitHub account yet:
+
+1. Go to [https://github.com/](https://github.com/)
+2. Click **"Sign up"**
+3. Follow the prompts to create a free account
+4. **Remember your username and password** — you'll need them later
+
+---
+
+## Step 2: Get Access to the Repository
+
+A repository is like a shared folder on GitHub. You need permission to access this private repository.
+
+### Request Access
+
+**Send the repository owner:**
+- Your GitHub username (e.g., "john_doe123")
+- They will add you as a collaborator
+
+**You'll know you have access when:**
+- You receive an email invitation to collaborate
+- Click the link in the email and accept the invitation
+
+### Create a Personal Access Token (PAT)
+
+GitHub no longer accepts passwords when downloading repositories. You need a special token instead.
+
+**Creating a PAT:**
+
+1. Log into GitHub in your web browser
+2. Click your profile picture (top-right) → **Settings**
+3. Scroll down the left sidebar → Click **Developer settings** (near the bottom)
+4. Click **Personal access tokens** → **Tokens (classic)**
+5. Click **Generate new token** → **Generate new token (classic)**
+6. Give it a note like "Review Queue Access"
+7. Set expiration to **90 days** (or longer if available)
+8. **Important:** Check the box next to **`repo`** (this selects all repo permissions)
+9. Scroll down and click **Generate token**
+10. **CRITICAL:** Copy the token immediately! It looks like `ghp_xxxxxxxxxxxx`
+11. **Save it somewhere safe** — you cannot see it again! (Notepad, password manager, etc.)
+
+---
+
+## Step 3: Clone the Repository
+
+"Cloning" means downloading a copy of the repository to your computer.
+
+### Choose Where to Save It
+
+First, decide where on your computer you want to keep this repository. Good locations:
+- `C:\Users\YourName\Documents\review-queue`
+- `C:\Users\YourName\Projects\review-queue`
+
+**NOT recommended:**
+- Desktop (gets cluttered)
+- OneDrive-synced folders (can cause conflicts with Git)
+
+### Clone Using PowerShell
+
+1. **Open PowerShell** (search for it in Windows Start menu)
+
+2. **Navigate to where you want to save the repository:**
+   ```powershell
+   cd C:\Users\YourName\Documents
    ```
+   Replace `YourName` with your actual Windows username.
 
 3. **Clone the repository:**
-   ```bash
+   ```powershell
    git clone https://github.com/Lizo-RoadTown/file_queuing_system.git
    ```
 
-4. **Navigate into the repository:**
-   ```bash
+4. **You'll be asked for credentials:**
+   - **Username:** Your GitHub username
+   - **Password:** **Paste your Personal Access Token** (NOT your GitHub password!)
+
+5. **Wait for it to download.** You'll see:
+   ```
+   Cloning into 'file_queuing_system'...
+   remote: Enumerating objects: ...
+   remote: Counting objects: ...
+   Receiving objects: 100% ...
+   ```
+
+6. **Navigate into the repository:**
+   ```powershell
    cd file_queuing_system
    ```
 
-### Option 2: Using VS Code
-
-1. **Open VS Code**
-
-2. **Press `Ctrl+Shift+P`** to open the Command Palette
-
-3. **Type** `Git: Clone` and select it
-
-4. **Paste the repository URL:**
-   ```
-   https://github.com/Lizo-RoadTown/file_queuing_system
-   ```
-
-5. **Choose a local folder** where you want to save it
-
-6. **When prompted, click "Open"** to open the cloned repository
-
-### Authentication
-
-If the repository is private, Git will prompt you to authenticate:
-- **Username:** Your GitHub username
-- **Password:** Use a **Personal Access Token** (PAT), not your GitHub password
-  - Generate a PAT: GitHub → Settings → Developer settings → Personal access tokens → Generate new token
-  - Required scopes: `repo` (full control of private repositories)
+✅ **Success!** You now have a local copy of the repository.
 
 ---
 
-## Repository Structure
+## Step 4: Set Up Your Python Environment
 
-```
-file_queuing_system/
-├── .github/                 # GitHub Actions workflows
-│   └── workflows/          # Automation for queue management
-├── docs/                   # Documentation
-│   ├── SETUP.md            # Maintainer setup guide
-│   └── LOCAL_SETUP_GUIDE.md # This file
-├── queue/                  # Queue management scripts
-├── reviews/                # Review submissions
-│   ├── in-progress/       # First reviews in progress
-│   ├── awaiting-review-2/ # Ready for second review
-│   └── completed/         # Finalized reviews
-├── CONTRIBUTING.md         # Reviewer workflow guide
-├── README.md              # Project overview
-└── .gitignore             # Git ignore rules
-```
+The repository requires specific Python libraries. We'll create an isolated environment so these don't conflict with anything else on your computer.
 
----
+### 4.1: Create an Environment Configuration File
 
-## Setting Up Your Environment
+We need to tell Python what libraries to install.
 
-### Create a Conda Environment
+1. **While still in PowerShell, navigate to the repository:**
+   ```powershell
+   cd C:\Users\YourName\Documents\file_queuing_system
+   ```
 
-The review workflow uses Jupyter notebooks to reproduce SDE simulations. You'll need a Python environment with the necessary scientific computing libraries.
-
-1. **Create an environment file** (`setup/env.yml`):
-
-   First, create the setup directory if it doesn't exist:
-   ```bash
+2. **Create a `setup` folder:**
+   ```powershell
    mkdir setup
    ```
 
-   Then create `setup/env.yml`:
+3. **Open VS Code to create a file:**
+   ```powershell
+   code setup/env.yml
+   ```
+   
+   This will open VS Code with a new empty file.
+
+4. **Copy and paste this EXACTLY into the file:**
    ```yaml
-   name: sde-review
+   name: review-queue
    channels:
      - conda-forge
    dependencies:
      - python=3.11
-     - numpy<2
+     - numpy
      - matplotlib
      - scipy
      - pandas
-     - tqdm
      - notebook
      - ipywidgets
-     - ipyevents
-     - nomkl
      - pip
-     - pip:
-         - diffrax
-         - jax==0.6
    ```
 
-2. **Create the environment:**
-   ```bash
-   conda env create -f setup/env.yml
-   ```
+5. **Save the file:**
+   - Press `Ctrl+S`
+   - Close the tab
 
-3. **Activate the environment:**
-   ```bash
-   conda activate sde-review
-   ```
+### 4.2: Create the Environment
 
-### Install Jupyter Kernel
+Back in PowerShell:
 
-After activating the environment, ensure Jupyter can use it:
+```powershell
+conda env create -f setup/env.yml
+```
 
-```bash
-python -m ipykernel install --user --name sde-review --display-name "Python (SDE Review)"
+This will take 2-5 minutes. You'll see lots of text scrolling by — that's normal!
+
+**When it's done, you'll see:**
+```
+done
+#
+# To activate this environment, use
+#
+#     $ conda activate review-queue
+```
+
+### 4.3: Activate the Environment
+
+Every time you work on this repository, you must activate the environment first:
+
+```powershell
+conda activate review-queue
+```
+
+Your PowerShell prompt will change to show `(review-queue)` at the beginning:
+```
+(review-queue) C:\Users\YourName\Documents\file_queuing_system>
+```
+
+✅ **You're ready!** The environment is active.
+
+### 4.4: Install Jupyter Kernel (One-Time Setup)
+
+This lets Jupyter notebooks use your environment:
+
+```powershell
+python -m ipykernel install --user --name review-queue --display-name "Review Queue Python"
 ```
 
 ---
 
-## Opening in VS Code
+## Step 5: Open in VS Code
 
-### Method 1: From Command Line
+Now let's open the repository in VS Code for editing.
 
-1. **Navigate to the repository folder:**
-   ```bash
-   cd C:\path\to\file_queuing_system
-   ```
+### Method 1: From PowerShell (Easiest)
 
-2. **Launch VS Code:**
-   ```bash
-   code .
-   ```
+If you're still in PowerShell in the repository folder:
+
+```powershell
+code .
+```
+
+The `.` means "this folder". VS Code will open.
 
 ### Method 2: From VS Code
 
-1. **Open VS Code**
-2. **File → Open Folder**
-3. **Navigate to** `file_queuing_system` and click **Select Folder**
+1. Open VS Code (search for it in Windows Start menu)
+2. Click **File → Open Folder**
+3. Navigate to `C:\Users\YourName\Documents\file_queuing_system`
+4. Click **Select Folder**
 
-### Configure VS Code Python Environment
+### First Time Setup in VS Code
 
-1. **Open the Command Palette** (`Ctrl+Shift+P`)
+#### Install VS Code Extensions
 
-2. **Type** `Python: Select Interpreter`
+When you first open the repository, VS Code might show a popup suggesting extensions. If so, click **Install All**. If not:
 
-3. **Choose** `Python (SDE Review)` or the `sde-review` conda environment
+1. Click the **Extensions** icon in the left sidebar (it looks like four squares)
+2. Search for and install these (click the blue "Install" button for each):
+   - **Python** (by Microsoft)
+   - **Jupyter** (by Microsoft)
+   - **GitHub Pull Requests and Issues** (by GitHub)
 
-4. **Create `.vscode/settings.json`** (if it doesn't exist):
-   ```json
-   {
-       "python.defaultInterpreterPath": "conda://sde-review",
-       "jupyter.notebookFileRoot": "${workspaceFolder}/reviews",
-       "python.analysis.extraPaths": [
-           "${workspaceFolder}/reviews"
-       ],
-       "files.exclude": {
-           "**/__pycache__": true,
-           "**/.ipynb_checkpoints": true
-       }
-   }
-   ```
+#### Select Python Interpreter
 
----
+1. Press `Ctrl+Shift+P` to open the **Command Palette** (a search box at the top)
+2. Type: `Python: Select Interpreter`
+3. Click on it
+4. Choose **`review-queue`** or **`Review Queue Python`**
 
-## Working Without GitHub Copilot
-
-If you're **not using** GitHub Copilot, you'll write all code manually. Here's how to work efficiently:
-
-### Setting Up for Manual Development
-
-1. **Familiarize yourself with the repository:**
-   - Read [`README.md`](../README.md)
-   - Read [`CONTRIBUTING.md`](../CONTRIBUTING.md)
-   - Review existing notebooks in `reviews/completed/` for examples
-
-2. **Use VS Code features:**
-   - **IntelliSense:** Auto-completion for Python (press `Ctrl+Space`)
-   - **Linting:** Install `pylint` or `flake8` to catch errors
-   - **Debugging:** Set breakpoints in notebooks (click left of line numbers)
-
-3. **Working with Jupyter Notebooks:**
-   - **Create a new notebook:** Right-click `reviews/in-progress/` → New File → `your-review.ipynb`
-   - **Select kernel:** Click kernel picker (top-right) → Choose `Python (SDE Review)`
-   - **Run cells:** `Shift+Enter`
-   - **Add cells:** Hover between cells → Click `+ Code` or `+ Markdown`
-
-4. **Common keyboard shortcuts:**
-   - `Ctrl+Enter`: Run current cell
-   - `Shift+Enter`: Run cell and move to next
-   - `Ctrl+Shift+P`: Command Palette
-   - `Ctrl+B`: Toggle sidebar
-   - `Ctrl+`` `: Toggle terminal
-
-5. **Reference documentation:**
-   - Keep browser tabs open for:
-     - [NumPy documentation](https://numpy.org/doc/)
-     - [Matplotlib documentation](https://matplotlib.org/stable/index.html)
-     - [SciPy documentation](https://docs.scipy.org/doc/scipy/)
-     - [JAX documentation](https://jax.readthedocs.io/)
-
-### Typical Workflow (No Copilot)
-
-1. **Claim an issue** by commenting `/checkout`
-2. **Create a folder** `reviews/in-progress/<manuscript-name>/`
-3. **Download the manuscript PDF** and place it in the folder
-4. **Create a Jupyter notebook** to reproduce the SDE model:
-   - Import libraries
-   - Define the SDE system
-   - Set parameters from the manuscript
-   - Run simulations
-   - Generate plots matching manuscript figures
-5. **Save output images** as PNG files
-6. **Create `metadata.yml`** (see template in [`CONTRIBUTING.md`](../CONTRIBUTING.md))
-7. **Open a Pull Request** with your changes
-8. **Wait for PR validation** (GitHub Actions will check folder structure)
-9. **Merge PR** and update the issue
+✅ **VS Code is now set up!**
 
 ---
 
-## Working With GitHub Copilot
+## Understanding the Repository
 
-If you have **GitHub Copilot** installed, you can leverage AI assistance for faster development.
+## Understanding the Repository
 
-### Installing GitHub Copilot
+Now that you've set everything up, let's understand what's in this repository and how it's organized.
 
-1. **Install the extension:**
-   - Open VS Code Extensions (`Ctrl+Shift+X`)
-   - Search for "GitHub Copilot"
-   - Click **Install**
-   - Sign in with your GitHub account (requires active Copilot subscription)
+### What is a Repository?
 
-2. **Install GitHub Copilot Chat (optional but recommended):**
-   - Search for "GitHub Copilot Chat"
-   - Click **Install**
+Think of a repository as a **shared project folder** that multiple people can work on together. Every file and change is tracked.
 
-### Using Copilot for Code Suggestions
+### Folder Structure
 
-Copilot provides **inline code suggestions** as you type:
+When you open the repository in VS Code, you'll see these folders in the left sidebar:
 
-1. **Start typing** and Copilot will suggest completions (shown in gray text)
-2. **Accept suggestion:** Press `Tab`
-3. **See alternative suggestions:** Press `Alt+]` (next) or `Alt+[` (previous)
-4. **Reject suggestion:** Keep typing or press `Esc`
-
-### Using Copilot Chat
-
-Copilot Chat provides conversational AI assistance:
-
-1. **Open Copilot Chat:**
-   - Click the chat icon in the sidebar, OR
-   - Press `Ctrl+Shift+I`
-
-2. **Ask questions:**
-   - "How do I implement a stochastic differential equation in Python using NumPy?"
-   - "Generate a plot comparing two SDE trajectories with confidence intervals"
-   - "Explain what this code does" (select code first)
-
-3. **Inline chat:**
-   - Press `Ctrl+I` to open inline chat
-   - Ask Copilot to modify selected code directly
-
-### Typical Workflow (With Copilot)
-
-1. **Claim an issue** by commenting `/checkout`
-2. **Create a folder** `reviews/in-progress/<manuscript-name>/`
-3. **Open Copilot Chat** and ask:
-   ```
-   I need to reproduce an SDE model from a research paper. The model is:
-   dS/dt = -βSI/N + ξ₁(t)
-   dI/dt = βSI/N - γI + ξ₂(t)
-   
-   where ξ₁, ξ₂ are Gaussian white noise terms. Can you help me set up a 
-   Jupyter notebook with the imports and basic structure?
-   ```
-
-4. **Create the notebook** `your-review.ipynb` and paste Copilot's suggested code
-5. **Iterate with Copilot:**
-   - "Add parameter values: β=0.5, γ=0.1, N=1000"
-   - "Generate a plot showing S(t) and I(t) over 100 time steps"
-   - "Add confidence bounds from 100 stochastic realizations"
-
-6. **Review and refine** the generated code
-7. **Save output images**
-8. **Ask Copilot to create metadata.yml:**
-   ```
-   Create a metadata.yml file with these details:
-   - name: SIR-Stochastic
-   - doi: 10.xxxx/xxxxx
-   - reviewer_1: my-github-username
-   - state: awaiting-review-2
-   ```
-
-9. **Open a Pull Request**
-10. **Iterate with Copilot if validation fails:**
-    - Select error message
-    - Press `Ctrl+I`
-    - Type "Fix this validation error"
-
-### Copilot Best Practices
-
-✅ **DO:**
-- Use Copilot for boilerplate code (imports, plot setup)
-- Ask Copilot to explain unfamiliar code in existing reviews
-- Use Copilot to generate test data or parameter sweeps
-- Let Copilot help with documentation and comments
-
-❌ **DON'T:**
-- Blindly accept all suggestions (always review generated code)
-- Trust Copilot for mathematical correctness (verify equations against the manuscript)
-- Skip manual testing (run the notebook to ensure it works)
-- Ignore warnings or errors in generated code
-
----
-
-## Common Workflows
-
-### Starting a First Review
-
-1. **Find a `queued` issue** in the Issues tab
-2. **Comment** `/checkout`
-3. **Create your review folder:**
-   ```bash
-   mkdir -p reviews/in-progress/YourManuscriptName
-   cd reviews/in-progress/YourManuscriptName
-   ```
-4. **Create your notebook** and reproduce the SDE model
-5. **Add the manuscript PDF**
-6. **Create `metadata.yml`**
-7. **Commit and push:**
-   ```bash
-   git add reviews/in-progress/YourManuscriptName/
-   git commit -m "First review: YourManuscriptName"
-   git push origin main
-   ```
-8. **Open a PR** via GitHub UI or VS Code GitHub extension
-9. **Wait for CI validation** to pass
-10. **Merge the PR**
-11. **Update the issue** to `awaiting-review-2`
-
-### Starting a Second Review
-
-1. **Find an `awaiting-review-2` issue**
-2. **Comment** `/checkout` (you'll be blocked if you did the first review)
-3. **Navigate to the existing folder:**
-   ```bash
-   cd reviews/awaiting-review-2/ManuscriptName
-   ```
-4. **Open the notebook** and re-run all cells
-5. **Verify outputs match** the manuscript claims
-6. **(Optional) Add `review2.md`** with notes
-7. **Comment** `/approve` on the issue
-8. **Done!** The automation zips the package, emails it, and closes the issue
-
-### Syncing Changes from GitHub
-
-If other reviewers have pushed changes:
-
-```bash
-git pull origin main
+```
+file_queuing_system/
+├── .github/           # Automation scripts (you won't edit these)
+├── docs/              # Documentation (guides like this one)
+├── queue/             # Queue management files
+├── reviews/           # Where you'll do your work
+│   ├── in-progress/       # Active reviews
+│   ├── awaiting-review-2/ # Ready for second review
+│   └── completed/         # Finished reviews
+├── CONTRIBUTING.md    # Instructions for reviewers
+├── README.md          # Project overview
+└── .gitignore         # Files Git should ignore
 ```
 
-Or in VS Code:
-- Click the Source Control icon (left sidebar)
-- Click the ⋯ menu → Pull
+**Key folders you'll use:**
+- **`reviews/`** - This is where all review work happens
+- **`docs/`** - Documentation and guides
 
-### Creating a Branch for Your Work (Recommended)
+### Read the Project Documentation
 
-Instead of working directly on `main`, use a branch:
+Before starting work, read these files (click them in VS Code to open):
 
-1. **Create and switch to a new branch:**
-   ```bash
-   git checkout -b review/manuscript-name
+1. **`README.md`** - Overview of how the queue system works
+2. **`CONTRIBUTING.md`** - Detailed instructions for reviewers
+
+---
+
+## Optional: GitHub Copilot
+
+GitHub Copilot is an AI assistant that can help you write code faster. **It costs money** (~$10/month) and is **completely optional**. Everything in this repository can be done without it.
+
+### What Copilot Does
+
+- Suggests code as you type (like autocomplete on your phone)
+- Can explain code if you don't understand it
+- Answers questions about programming
+
+### Should You Get It?
+
+**Get Copilot if:**
+- You code regularly and want to work faster
+- You're learning and want AI help
+- Your organization pays for it
+
+**Skip Copilot if:**
+- You're only doing occasional reviews
+- You prefer to learn by researching yourself
+- You don't want to pay for it
+
+### If You Want Copilot
+
+1. Subscribe at [https://github.com/copilot](https://github.com/copilot)
+2. In VS Code, install these extensions:
+   - **GitHub Copilot**
+   - **GitHub Copilot Chat**
+3. Sign in when prompted
+
+### Using Copilot (Brief Basics)
+
+**Inline suggestions:**
+- As you type, gray text suggestions appear
+- Press `Tab` to accept, `Esc` to reject
+
+**Copilot Chat:**
+- Press `Ctrl+Shift+I` to open chat
+- Ask questions like "How do I create a plot in Python?"
+- It will suggest code
+
+**⚠️ Important:** Always review Copilot's suggestions! Don't blindly copy code you don't understand.
+
+---
+
+## Daily Workflow
+
+Here's how to work with the repository on a daily basis.
+
+### Starting Your Work Session
+
+Every time you sit down to work:
+
+1. **Open PowerShell**
+
+2. **Navigate to the repository:**
+   ```powershell
+   cd C:\Users\YourName\Documents\file_queuing_system
    ```
 
-2. **Work on your review**
+3. **Activate the Python environment:**
+   ```powershell
+   conda activate review-queue
+   ```
+   You'll see `(review-queue)` appear before your prompt.
 
-3. **Push the branch:**
-   ```bash
-   git push origin review/manuscript-name
+4. **Get the latest changes from GitHub:**
+   ```powershell
+   git pull
+   ```
+   This downloads any changes other people made.
+
+5. **Open VS Code:**
+   ```powershell
+   code .
    ```
 
-4. **Open a PR** from your branch to `main`
+✅ **You're ready to work!**
+
+### Working on a Review
+
+This is covered in detail in [`CONTRIBUTING.md`](../CONTRIBUTING.md), but the general flow:
+
+1. **Find an issue** you want to work on (on GitHub)
+2. **Comment `/checkout`** to claim it
+3. **Create a folder** in `reviews/in-progress/` for your work
+4. **Do your review work** (create notebooks, add files, etc.)
+5. **Save your changes to Git** (see below)
+6. **Open a Pull Request** on GitHub
+
+### Saving Changes to Git
+
+Git tracks changes in three steps: **stage → commit → push**.
+
+#### Check What Changed
+
+```powershell
+git status
+```
+
+This shows which files you've changed (in red) and which are ready to save (in green).
+
+#### Stage Files (Mark Them for Saving)
+
+To stage all changed files:
+```powershell
+git add .
+```
+
+Or to stage specific files:
+```powershell
+git add reviews/in-progress/MyReview/notebook.ipynb
+```
+
+#### Commit Changes (Save Locally)
+
+```powershell
+git commit -m "Describe what you did here"
+```
+
+Replace the text in quotes with a brief description, like:
+- `"Add initial review for XYZ manuscript"`
+- `"Fix typo in metadata file"`
+- `"Complete first review"`
+
+#### Push to GitHub (Upload)
+
+```powershell
+git push
+```
+
+This uploads your changes to GitHub so others can see them.
+
+**Full example:**
+```powershell
+git add .
+git commit -m "Complete first review for ABC manuscript"
+git push
+```
+
+### Opening a Pull Request
+
+A Pull Request (PR) is how you ask to add your changes to the main repository.
+
+1. **Push your changes** (see above)
+2. **Go to GitHub** in your web browser:
+   `https://github.com/Lizo-RoadTown/file_queuing_system`
+3. **You'll see a yellow banner** saying "YourBranch had recent pushes"
+4. **Click "Compare & pull request"**
+5. **Write a title** describing your changes
+6. **Click "Create pull request"**
+7. **Wait for approval** from a maintainer
+
+### Syncing Changes from Others
+
+If someone else made changes:
+
+```powershell
+git pull
+```
+
+This downloads their changes to your computer.
+
+**Do this:**
+- At the start of each work session
+- Before opening a Pull Request
+- Whenever GitHub tells you your branch is "behind"
+
+### Ending Your Work Session
+
+1. **Make sure you've saved everything:**
+   ```powershell
+   git status
+   ```
+   If you see changed files, commit and push them (or decide to keep them for next time).
+
+2. **Close VS Code**
+
+3. **Deactivate the environment (optional):**
+   ```powershell
+   conda deactivate
+   ```
+
+Done! Your work is saved both locally and on GitHub.
 
 ---
 
 ## Troubleshooting
 
-### Cannot Clone Repository (Permission Denied)
+### Git Says "Permission Denied" or "Repository Not Found"
 
-**Problem:** `fatal: repository not found` or `permission denied`
+**Possible causes:**
+- You haven't been added as a collaborator yet
+- Your Personal Access Token expired or is wrong
 
-**Solution:**
-- Verify you've been added as a collaborator
-- Use a Personal Access Token (PAT) instead of your password
-- Check your GitHub username is correct
+**Solutions:**
+1. Ask the repository owner to add you as a collaborator
+2. Generate a new Personal Access Token (see Step 2)
+3. When Git asks for a password, paste your PAT, not your GitHub password
 
-### Conda Environment Not Found in VS Code
+### "conda: command not found" or "conda is not recognized"
 
-**Problem:** The `sde-review` environment doesn't appear in the kernel picker
+**Cause:** PowerShell doesn't know where conda is installed.
 
-**Solution:**
-1. Activate the environment in terminal:
-   ```bash
-   conda activate sde-review
-   ```
-2. Install the kernel:
-   ```bash
-   python -m ipykernel install --user --name sde-review
-   ```
-3. Reload VS Code window (`Ctrl+Shift+P` → `Developer: Reload Window`)
+**Solutions:**
+1. **Close and reopen PowerShell** (this often fixes it)
+2. Manually add conda to PATH:
+   - Search "Environment Variables" in Windows Start
+   - Click "Environment Variables"
+   - Under "User variables", find "Path"
+   - Click "Edit" → "New"
+   - Add: `C:\Users\YourName\miniconda3\Scripts`
+   - Click OK
+   - Restart PowerShell
 
-### Imports Fail in Jupyter Notebook
+### "No module named 'xyz'" When Running Notebooks
 
-**Problem:** `ModuleNotFoundError: No module named 'numpy'`
+**Cause:** The Python environment isn't active or the package isn't installed.
 
-**Solution:**
-1. Check you've selected the correct kernel (top-right of notebook)
-2. Click the kernel name → Select `Python (SDE Review)`
+**Solutions:**
+1. Make sure you activated the environment: `conda activate review-queue`
+2. Check your Jupyter kernel (top-right of notebook) is set to "Review Queue Python"
 3. If still failing, reinstall the environment:
-   ```bash
-   conda env remove -n sde-review
+   ```powershell
+   conda env remove -n review-queue
    conda env create -f setup/env.yml
    ```
 
-### Git Push Rejected
+### VS Code Can't Find Python
 
-**Problem:** `error: failed to push some refs`
+**Solutions:**
+1. Press `Ctrl+Shift+P`
+2. Type: `Python: Select Interpreter`
+3. Choose `review-queue` or `Review Queue Python`
+4. Reload the VS Code window: `Ctrl+Shift+P` → `Developer: Reload Window`
 
-**Solution:**
-- Pull first: `git pull origin main`
-- Resolve any merge conflicts
-- Then push: `git push origin main`
+### Git Says "Your Branch is Behind"
 
-### PR Validation Fails
-
-**Problem:** GitHub Actions workflow "Validate Submission" fails
-
-**Solution:**
-- Check the workflow logs in the Actions tab
-- Common issues:
-  - Missing `metadata.yml`
-  - Folder in wrong location (`in-progress` vs `awaiting-review-2`)
-  - Missing `.ipynb` or `.pdf` file
-  - Invalid YAML syntax in `metadata.yml`
-- Fix the issues and push again
-
-### Copilot Not Working
-
-**Problem:** Copilot suggestions not appearing
+**Cause:** Someone else made changes you don't have yet.
 
 **Solution:**
-1. Check Copilot status (bottom-right, look for Copilot icon)
-2. Verify you're signed in: `Ctrl+Shift+P` → `GitHub Copilot: Sign In`
-3. Check your subscription is active on GitHub
-4. Restart VS Code
-5. Check Copilot is enabled for your file type:
-   - `Ctrl+Shift+P` → `Preferences: Open Settings (UI)`
-   - Search "Copilot enable"
-   - Ensure `*` is in the enabled languages
+```powershell
+git pull
+```
 
-### OneDrive Sync Issues
+If this fails with conflicts, ask a maintainer for help.
 
-**Problem:** Files syncing across computers causing conflicts (based on your workflow)
+### Git Push Fails with "Updates Were Rejected"
+
+**Cause:** Someone else pushed changes before you did.
 
 **Solution:**
-- **Don't sync the conda environment** across machines
-- Add to `.gitignore` (already done for Python):
-  ```
-  __pycache__/
-  .ipynb_checkpoints/
-  *.pyc
-  ```
-- Exclude the conda environment folder from OneDrive sync:
-  - Right-click the environment folder
-  - **Free up space** (keeps it local only)
+1. Pull the changes: `git pull`
+2. If it says "merge failed", you have conflicts (ask a maintainer for help)
+3. If it succeeds, then push: `git push`
+
+### "Git is Not Recognized as a Command"
+
+**Cause:** Git isn't installed or isn't in your PATH.
+
+**Solutions:**
+1. Reinstall Git (see Step 1.1)
+2. During installation, choose "Add Git to PATH"
+3. Restart PowerShell
+
+### VS Code Shows Lots of Red Squiggly Lines
+
+**Possible causes:**
+- Python isn't selected
+- Python environment isn't active
+- A file has actual errors
+
+**Solutions:**
+1. Select the correct Python interpreter (see "VS Code Can't Find Python" above)
+2. If it's a `.ipynb` file, ignore most red squiggles (they're often false positives)
+3. If it's a `.py` file, read the error and fix it
+
+### OneDrive Sync Conflicts
+
+**Cause:** If you're syncing the repository folder with OneDrive, Git and OneDrive can fight over files.
+
+**Solution:**
+**Don't put the repository in an OneDrive-synced folder**. Instead:
+- Put it in `C:\Users\YourName\Projects\` (not synced)
+- Use Git to sync changes, not OneDrive
+- If you must sync, exclude the `.git` folder from OneDrive
+
+### Forgot My Personal Access Token
+
+**Solution:**
+1. Generate a new one (see Step 2.3)
+2. Save it somewhere safe this time (password manager, secure note)
+3. Next time Git asks for a password, use the new token
 
 ---
 
 ## Additional Resources
 
-- **GitHub Docs:** [Working with Pull Requests](https://docs.github.com/en/pull-requests)
-- **VS Code Docs:** [Working with Jupyter Notebooks](https://code.visualstudio.com/docs/datascience/jupyter-notebooks)
-- **Git Cheat Sheet:** [GitHub Git Cheat Sheet](https://education.github.com/git-cheat-sheet-education.pdf)
-- **Conda Cheat Sheet:** [Conda Commands](https://docs.conda.io/projects/conda/en/latest/user-guide/cheatsheet.html)
+### Learning More About Git
+
+- **Git Basics:** [https://git-scm.com/book/en/v2/Getting-Started-About-Version-Control](https://git-scm.com/book/en/v2/Getting-Started-About-Version-Control)
+- **GitHub Guides:** [https://guides.github.com/](https://guides.github.com/)
+- **Git Cheat Sheet:** [https://education.github.com/git-cheat-sheet-education.pdf](https://education.github.com/git-cheat-sheet-education.pdf)
+
+### Learning More About VS Code
+
+- **VS Code Basics:** [https://code.visualstudio.com/docs/getstarted/userinterface](https://code.visualstudio.com/docs/getstarted/userinterface)
+- **Jupyter in VS Code:** [https://code.visualstudio.com/docs/datascience/jupyter-notebooks](https://code.visualstudio.com/docs/datascience/jupyter-notebooks)
+
+### Learning More About Python/Conda
+
+- **Conda Basics:** [https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html)
+- **Conda Cheat Sheet:** [https://docs.conda.io/projects/conda/en/latest/user-guide/cheatsheet.html](https://docs.conda.io/projects/conda/en/latest/user-guide/cheatsheet.html)
+
+### Project-Specific Help
+
+- **README:** [`../README.md`](../README.md) - How the queue system works
+- **CONTRIBUTING:** [`../CONTRIBUTING.md`](../CONTRIBUTING.md) - How to do reviews  
+- **SETUP:** [`SETUP.md`](SETUP.md) - For maintainers only
 
 ---
 
-## Questions?
+## Getting Help
 
-If you encounter issues not covered here:
-1. Check the [repository README](../README.md)
-2. Review [CONTRIBUTING.md](../CONTRIBUTING.md)
-3. Open an issue with the `question` label
-4. Contact a repository maintainer
+If you're stuck:
 
-Happy reviewing! 🎉
+1. **Check this guide's Troubleshooting section** (above)
+2. **Read the error message carefully** - Google it if unclear
+3. **Ask a teammate or maintainer** - include:
+   - What you were trying to do
+   - The error message (exact text or screenshot)
+   - What you've already tried
+4. **Open an issue on GitHub** for documentation improvements
+
+Remember: **Everyone was a beginner once!** Don't hesitate to ask questions.
+
+---
+
+## Quick Reference Commands
+
+### Daily Workflow
+```powershell
+# Navigate to repository
+cd C:\Users\YourName\Documents\file_queuing_system
+
+# Activate environment
+conda activate review-queue
+
+# Get latest changes
+git pull
+
+# Open VS Code
+code .
+```
+
+### Saving Changes
+```powershell
+# Check what changed
+git status
+
+# Stage all changes
+git add .
+
+# Commit with message
+git commit -m "Your message here"
+
+# Push to GitHub
+git push
+```
+
+### Environment Management
+```powershell
+# Activate environment
+conda activate review-queue
+
+# Deactivate environment
+conda deactivate
+
+# List all environments
+conda env list
+
+# Delete and recreate environment
+conda env remove -n review-queue
+conda env create -f setup/env.yml
+```
+
+---
+
+**You're all set!** Return to [`CONTRIBUTING.md`](../CONTRIBUTING.md) to learn how to do reviews. Good luck! 🎉
