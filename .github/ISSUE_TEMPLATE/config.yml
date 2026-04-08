@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Reviewer guide
+    url: https://github.com/Lizo-RoadTown/file_queuing_system/blob/main/CONTRIBUTING.md
+    about: How to claim, submit, and approve reviews.

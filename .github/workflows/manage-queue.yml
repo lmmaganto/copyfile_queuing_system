@@ -1,0 +1,161 @@
+name: Manage Queue (slash commands)
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  handle-command:
+    if: github.event.issue.state == 'open' && (startsWith(github.event.comment.body, '/checkout') || startsWith(github.event.comment.body, '/release') || startsWith(github.event.comment.body, '/approve'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Verify commenter is an authorized reviewer
+        id: auth
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commenter = context.payload.comment.user.login;
+            // TODO: switch to team check after transfer to org.
+            // Replace the block below with:
+            //   const team = process.env.REVIEWER_TEAM;     // e.g. "sde-reviewers"
+            //   const org  = context.repo.owner;
+            //   const { data } = await github.rest.teams.getMembershipForUserInOrg({
+            //     org, team_slug: team, username: commenter,
+            //   });
+            //   if (data.state !== 'active') throw new Error('not a team member');
+            try {
+              await github.rest.repos.checkCollaborator({
+                owner: context.repo.owner,
+                repo:  context.repo.repo,
+                username: commenter,
+              });
+            } catch (e) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: context.issue.number,
+                body: `@${commenter} sorry — only authorized reviewers can run slash commands here.`,
+              });
+              core.setFailed('unauthorized');
+              return;
+            }
+            core.setOutput('user', commenter);
+
+      - name: Dispatch command
+        if: success()
+        uses: actions/github-script@v7
+        env:
+          COMMENTER: ${{ steps.auth.outputs.user }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const commenter = process.env.COMMENTER;
+            const body = context.payload.comment.body.trim();
+            const cmd  = body.split(/\s+/)[0];
+            const issue = context.payload.issue;
+            const labels = issue.labels.map(l => l.name);
+
+            const reply = (msg) => github.rest.issues.createComment({
+              ...context.repo, issue_number: issue.number, body: msg,
+            });
+            const setLabels = async (toAdd, toRemove) => {
+              for (const l of toRemove) {
+                try { await github.rest.issues.removeLabel({
+                  ...context.repo, issue_number: issue.number, name: l,
+                }); } catch (_) {}
+              }
+              if (toAdd.length) {
+                await github.rest.issues.addLabels({
+                  ...context.repo, issue_number: issue.number, labels: toAdd,
+                });
+              }
+            };
+
+            // Extract folder marker from issue body, e.g.:
+            //   <!-- folder: reviews/awaiting-review-2/HBV -->
+            const folderMatch = (issue.body || '').match(/<!--\s*folder:\s*(.+?)\s*-->/);
+            const folder = folderMatch ? folderMatch[1] : null;
+
+            // Read reviewer_1 from metadata.yml if present
+            let reviewer1 = null;
+            if (folder && fs.existsSync(path.join(folder, 'metadata.yml'))) {
+              const yml = fs.readFileSync(path.join(folder, 'metadata.yml'), 'utf8');
+              const m = yml.match(/^reviewer_1:\s*(.+?)\s*$/m);
+              if (m && m[1] && m[1] !== 'null') reviewer1 = m[1];
+            }
+
+            // ---------- /checkout ----------
+            if (cmd === '/checkout') {
+              if (labels.includes('queued')) {
+                await github.rest.issues.addAssignees({
+                  ...context.repo, issue_number: issue.number, assignees: [commenter],
+                });
+                await setLabels(['review-1-active'], ['queued']);
+                await reply(`@${commenter} checked out for **first review**. Submit a PR adding your work under \`reviews/in-progress/<name>/\` (notebook + PDF + output image + \`metadata.yml\` with \`reviewer_1: ${commenter}\`). Run \`/release\` to give it back.`);
+                return;
+              }
+              if (labels.includes('awaiting-review-2')) {
+                if (reviewer1 && reviewer1 === commenter) {
+                  await reply(`@${commenter} you were the **first reviewer** for this item — a different reviewer must perform the second review.`);
+                  return;
+                }
+                if (!reviewer1) {
+                  await reply(`Could not determine first reviewer for this issue (missing folder marker or metadata). Aborting checkout — contact the maintainer.`);
+                  return;
+                }
+                await github.rest.issues.addAssignees({
+                  ...context.repo, issue_number: issue.number, assignees: [commenter],
+                });
+                await setLabels(['review-2-active'], ['awaiting-review-2']);
+                await reply(`@${commenter} checked out for **second review**. When done, comment \`/approve\` to finalize, or \`/release\` to give it back.`);
+                return;
+              }
+              await reply(`This item is not currently checkable-out (state: \`${labels.join(', ')}\`).`);
+              return;
+            }
+
+            // ---------- /release ----------
+            if (cmd === '/release') {
+              const assignees = (issue.assignees || []).map(a => a.login);
+              if (!assignees.includes(commenter)) {
+                await reply(`@${commenter} you're not the current reviewer on this item.`);
+                return;
+              }
+              await github.rest.issues.removeAssignees({
+                ...context.repo, issue_number: issue.number, assignees: [commenter],
+              });
+              if (labels.includes('review-1-active')) {
+                await setLabels(['queued'], ['review-1-active']);
+              } else if (labels.includes('review-2-active')) {
+                await setLabels(['awaiting-review-2'], ['review-2-active']);
+              }
+              await reply(`Released by @${commenter}.`);
+              return;
+            }
+
+            // ---------- /approve ----------
+            if (cmd === '/approve') {
+              if (!labels.includes('review-2-active')) {
+                await reply(`\`/approve\` is only valid during second review (current: \`${labels.join(', ')}\`).`);
+                return;
+              }
+              const assignees = (issue.assignees || []).map(a => a.login);
+              if (!assignees.includes(commenter)) {
+                await reply(`@${commenter} only the assigned second reviewer can approve.`);
+                return;
+              }
+              if (reviewer1 && reviewer1 === commenter) {
+                await reply(`@${commenter} integrity check failed: you are recorded as the first reviewer.`);
+                return;
+              }
+              await setLabels(['complete'], ['review-2-active']);
+              await reply(`Approved by @${commenter}. Finalizing and emailing the package…`);
+              // notify-on-complete.yml takes over from here on the 'complete' label.
+              return;
+            }

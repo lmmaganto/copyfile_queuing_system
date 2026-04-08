@@ -1,0 +1,67 @@
+name: Validate Submission
+
+on:
+  pull_request:
+    paths:
+      - 'reviews/in-progress/**'
+      - 'reviews/awaiting-review-2/**'
+      - 'reviews/completed/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check submission shape
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const { execSync } = require('child_process');
+
+            // Find which review folders this PR touches
+            const changed = execSync(
+              `git diff --name-only origin/${context.payload.pull_request.base.ref}...HEAD`
+            ).toString().split('\n').filter(Boolean);
+
+            const folders = new Set();
+            for (const f of changed) {
+              const m = f.match(/^reviews\/(in-progress|awaiting-review-2|completed)\/([^\/]+)\//);
+              if (m) folders.add(`reviews/${m[1]}/${m[2]}`);
+            }
+
+            if (folders.size === 0) {
+              core.info('No review folders touched — skipping shape check.');
+              return;
+            }
+
+            const errors = [];
+            for (const folder of folders) {
+              if (!fs.existsSync(folder)) continue;
+              const files = fs.readdirSync(folder);
+              const hasNotebook = files.some(f => f.endsWith('.ipynb'));
+              const hasPdf      = files.some(f => f.toLowerCase().endsWith('.pdf'));
+              const hasMeta     = files.includes('metadata.yml');
+              const hasImage    = files.some(f => /\.(png|jpe?g|svg)$/i.test(f));
+
+              if (!hasNotebook) errors.push(`\`${folder}\` is missing a \`.ipynb\` notebook.`);
+              if (!hasPdf)      errors.push(`\`${folder}\` is missing a \`.pdf\` manuscript.`);
+              if (!hasMeta)     errors.push(`\`${folder}\` is missing \`metadata.yml\`.`);
+              if (!hasImage)    core.warning(`${folder} has no output image — allowed but discouraged.`);
+            }
+
+            if (errors.length) {
+              const body = `### Submission validation failed\n\n${errors.map(e => '- ' + e).join('\n')}\n\nSee \`CONTRIBUTING.md\` for the required folder shape.`;
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.payload.pull_request.number,
+                body,
+              });
+              core.setFailed(errors.join('; '));
+            }

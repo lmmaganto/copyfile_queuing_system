@@ -1,0 +1,33 @@
+name: Add manuscript to review queue
+description: Submit a new DOI or URL for SDE manuscript review
+title: "[QUEUE] "
+labels: ["queued"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Short name
+      description: A short identifier for this manuscript (e.g., "HBV", "Chikungunya Virus"). Used as the folder name.
+      placeholder: e.g. HBV
+    validations:
+      required: true
+  - type: input
+    id: doi_or_url
+    attributes:
+      label: DOI or URL
+      description: The DOI or full URL of the manuscript to review.
+      placeholder: e.g. 10.1007/s00332-022-09883-w  or  https://doi.org/...
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes (optional)
+      description: Any context for reviewers — model type, known issues, priority, etc.
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        **Next steps:** Once submitted, this item enters the queue. A reviewer can claim it by commenting `/checkout` on this issue.
