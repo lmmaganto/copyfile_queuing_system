@@ -12,21 +12,12 @@ This document describes the technical methodology behind the review queue system
 
 ---
 
-## Table of Contents
-
-1. [What is This System?](#what-is-this-system)
-2. [Core Components](#core-components)
-3. [How Transparency is Achieved](#how-transparency-is-achieved)
-4. [The Queuing System Mechanism](#the-queuing-system-mechanism)
-5. [How Self-Review is Prevented](#how-self-review-is-prevented)
-6. [Version Control and Audit Trail](#version-control-and-audit-trail)
-7. [Automated Workflows](#automated-workflows)
-8. [For Reviewers](#for-reviewers)
-9. [For Maintainers](#for-maintainers)
+Click any section below to expand it.
 
 ---
 
-## What is This System?
+<details>
+<summary><strong>What is This System?</strong></summary>
 
 This repository manages a queue of manuscripts awaiting reproducibility verification. Each manuscript goes through two independent reviews where reviewers attempt to reproduce computational results from published or submitted research papers.
 
@@ -40,9 +31,12 @@ The system uses GitHub's built-in features to:
 
 **Key Design Goal:** Everything is visible, traceable, and verifiable. No hidden decisions, no black-box automation.
 
+</details>
+
 ---
 
-## Core Components
+<details>
+<summary><strong>Core Components</strong></summary>
 
 The system is built entirely on standard GitHub features:
 
@@ -83,7 +77,7 @@ The system is built entirely on standard GitHub features:
 **Why this creates transparency:**
 - **Before merging:** Everyone can see what a reviewer is submitting
 - **Diff view:** GitHub shows exactly what files are being added and their contents
-- **Validation:** Automated checks run publicly—everyone sees if checks pass or fail
+- **Validation:** Automated checks run publicly-everyone sees if checks pass or fail
 - **Discussion:** Anyone can comment on the PR to ask questions or request changes
 - **Approval required:** Changes don't automatically enter the repository; a maintainer must approve
 
@@ -110,7 +104,7 @@ The system is built entirely on standard GitHub features:
 **Why this creates transparency:**
 - Visual status at a glance (filter issues by label to see all manuscripts in a specific state)
 - Label changes are logged in issue timeline with timestamps
-- No way to skip states—automation enforces the state machine
+- No way to skip states-automation enforces the state machine
 - Color coding makes queue status obvious
 
 ### 4. GitHub Actions (Workflows)
@@ -144,9 +138,12 @@ The system is built entirely on standard GitHub features:
 - **Inspection:** Anyone can see what changed between versions
 - **Immutability:** Once committed, history cannot be secretly altered (commits are cryptographically hashed)
 
+</details>
+
 ---
 
-## How Transparency is Achieved
+<details>
+<summary><strong>How Transparency is Achieved</strong></summary>
 
 Every action in this system is visible and verifiable:
 
@@ -193,9 +190,12 @@ Every action in this system is visible and verifiable:
 - ❌ Delete workflow execution logs (GitHub retains them)
 - ❌ Run slash commands unless you're a repository collaborator (permission check)
 
+</details>
+
 ---
 
-## The Queuing System Mechanism
+<details>
+<summary><strong>The Queuing System Mechanism</strong></summary>
 
 ### How Manuscripts Enter the Queue
 
@@ -279,9 +279,12 @@ Invalid transitions are rejected:
 
 If someone tries to run `/checkout` on an issue in the wrong state, the workflow rejects it and posts an error comment.
 
+</details>
+
 ---
 
-## How Self-Review is Prevented
+<details>
+<summary><strong>How Self-Review is Prevented</strong></summary>
 
 **The Problem:** A reviewer could theoretically review their own first submission as the second reviewer, defeating the purpose of independent verification.
 
@@ -326,9 +329,12 @@ def handle_checkout(issue, commenter):
 - If `metadata.yml` has wrong format → validation check fails
 - If someone manually edits Git history to change metadata → Git log shows the manual edit (not normal workflow)
 
+</details>
+
 ---
 
-## Version Control and Audit Trail
+<details>
+<summary><strong>Version Control and Audit Trail</strong></summary>
 
 ### Every Action Leaves a Trace
 
@@ -385,9 +391,12 @@ def handle_checkout(issue, commenter):
 2. See commit counts, lines added/removed per person
 3. Click a person to see their commit history
 
+</details>
+
 ---
 
-## Automated Workflows
+<details>
+<summary><strong>Automated Workflows</strong></summary>
 
 All automation is defined in `.github/workflows/` and runs on GitHub's servers.
 
@@ -469,9 +478,12 @@ All automation is defined in `.github/workflows/` and runs on GitHub's servers.
 - Issue closure visible in issue timeline
 - (Email recipient is configured in repository secrets, visible to maintainers)
 
+</details>
+
 ---
 
-## For Reviewers
+<details>
+<summary><strong>For Reviewers</strong></summary>
 
 **New reviewers:** Follow this learning path:
 1. [LOCAL_SETUP_GUIDE.md](docs/LOCAL_SETUP_GUIDE.md) - Install software and set up environment
@@ -484,9 +496,12 @@ All automation is defined in `.github/workflows/` and runs on GitHub's servers.
 
 **To finalize a review:** (Second reviewer only) Comment `/approve` when verification is complete
 
+</details>
+
 ---
 
-## For Maintainers
+<details>
+<summary><strong>For Maintainers</strong></summary>
 
 **Setup instructions:** See [docs/SETUP.md](docs/SETUP.md) for:
 - Creating required labels
@@ -498,9 +513,12 @@ All automation is defined in `.github/workflows/` and runs on GitHub's servers.
 
 **Handling edge cases:** If workflows fail or issues get stuck, manually update labels and post explanatory comments (all actions still logged)
 
+</details>
+
 ---
 
-## Why This Design?
+<details>
+<summary><strong>Why This Design?</strong></summary>
 
 **No Custom Servers:**
 - GitHub provides all infrastructure (hosting, compute, authentication)
@@ -527,9 +545,14 @@ All automation is defined in `.github/workflows/` and runs on GitHub's servers.
 - Jupyter notebooks already standard in computational research
 - No specialized software to learn
 
+</details>
+
 ---
 
-## Summary
+<details open>
+<summary><strong>Summary</strong></summary>
+
+This repository manages a queue of manuscripts awaiting reproducibility verification. Each manuscript goes through two independent reviews where reviewers attempt to reproduce computational results from published or submitted research papers.
 
 This system uses standard GitHub features (issues, pull requests, labels, actions, version control) to create a transparent, auditable, and automated review queue. Every action is logged, every decision is visible, and integrity rules (like reviewer separation) are enforced by code rather than policy.
 
@@ -541,3 +564,5 @@ This system uses standard GitHub features (issues, pull requests, labels, action
 - Labels enforce state machine transitions
 
 **Result:** A review queue where nothing happens in secret, everything is traceable, and anyone with access can verify that the process followed the rules.
+
+</details>
