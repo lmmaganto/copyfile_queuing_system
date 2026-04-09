@@ -42,7 +42,9 @@ Use a test recipient in `NOTIFY_TO` while verifying the workflow end-to-end, the
 
 ## 3. Seed existing reviews
 
-If there are review folders under `reviews/awaiting-review-2/` or `reviews/in-progress/` without tracking issues, run the **Bootstrap Seed Issues** workflow once from the Actions tab. It is idempotent — safe to re-run.
+The **Bootstrap Seed Issues** workflow now runs automatically on pushes to `main` that add or change folders under `reviews/awaiting-review-2/` or `reviews/in-progress/`. It creates tracking issues only for folders that do not already have one, so it is idempotent and safe to re-run.
+
+If needed, you can still run **Bootstrap Seed Issues** manually from the Actions tab to backfill or re-check the repository.
 
 ## 4. Test end-to-end
 

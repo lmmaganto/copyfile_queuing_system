@@ -1,10 +1,17 @@
 name: Bootstrap Seed Issues
 
-# One-time (or repeatable) workflow to create issues for review folders that
-# don't yet have a tracking issue. Run from the Actions tab via "Run workflow".
+# Repeatable workflow to create issues for review folders that don't yet have a
+# tracking issue. It can be run manually, and it also auto-runs when review
+# folders are added or changed on main.
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'reviews/in-progress/**'
+      - 'reviews/awaiting-review-2/**'
 
 permissions:
   issues: write
