@@ -408,7 +408,9 @@ If you just completed a **first review**:
 
 If you just completed a **second review**:
 - Comment `/approve` on the issue
-- The system will automatically close it and email the package
+- Your reviewer work ends there
+- If the maintainer has configured email delivery, automation will then move the tracked folder or standalone file into `reviews/completed/`, close the issue, and send the package
+- Reviewer separation is enforced automatically when the first reviewer is recorded in `metadata.yml`
 
 ---
 

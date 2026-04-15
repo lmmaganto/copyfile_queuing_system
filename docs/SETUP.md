@@ -40,6 +40,8 @@ In **Settings → Secrets and variables → Actions**, add:
 
 Use a test recipient in `NOTIFY_TO` while verifying the workflow end-to-end, then update the secret to the production recipient.
 
+Current behavior: the reviewer automation supports tracked review folders and standalone files. For folder-based items with `metadata.yml`, it also enforces that the second reviewer cannot be the same as the recorded first reviewer.
+
 ## 3. Seed existing reviews
 
 The **Bootstrap Seed Issues** workflow now runs automatically on pushes to `main` that add or change review items under `reviews/awaiting-review-2/`. It supports both review folders and standalone files placed directly in that stage directory. It creates tracking issues only for items that do not already have one, so it is idempotent and safe to re-run.
@@ -51,7 +53,7 @@ If needed, you can still run **Bootstrap Seed Issues** manually from the Actions
 1. Pick one of the seeded `awaiting-review-2` issues.
 2. From a second account (different from the recorded `reviewer_1`), comment `/checkout`.
 3. Comment `/approve`.
-4. Verify the folder moves to `reviews/completed/<name>/`, the issue closes, and the test recipient receives the zipped package.
+4. Verify the tracked folder or file moves into `reviews/completed/`, the issue closes, and the test recipient receives the zipped package.
 
 If anything fails, check the workflow logs in the Actions tab.
 

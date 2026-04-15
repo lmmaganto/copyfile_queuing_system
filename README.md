@@ -9,7 +9,7 @@ It was designed for academic teams that need a simple way to coordinate first-pa
 - Tracks each submission as a GitHub issue
 - Records review packages in the repository so work is visible and auditable
 - Enforces a two-stage review flow with different reviewers at each stage
-- Automates state changes, packaging, and completion notifications with GitHub Actions
+- Automates queue state changes and, when maintainer email settings are configured, final packaging and notification for tracked review folders and standalone review files
 
 The review lifecycle is:
 
@@ -25,8 +25,8 @@ This keeps the process quick to explain:
 
 - New work enters the queue as an issue
 - A first reviewer claims it and prepares the review package
-- A second reviewer independently checks it
-- Approval closes the issue and triggers the final delivery step
+- A second reviewer independently checks a tracked review folder or standalone review file
+- Approval ends the reviewer workflow; repository automation may then finalize delivery if the maintainer setup is in place
 
 ## Documentation
 

@@ -18,9 +18,9 @@ Comment one of these on a review issue:
 |---|---|---|
 | `/checkout` | On a `queued` or `awaiting-review-2` issue | Assigns you and moves the issue to the next "active" state |
 | `/release`  | While you have something checked out | Hands it back to the queue |
-| `/approve`  | On `review-2-active`, by the assigned second reviewer | Marks complete, emails the package, closes the issue |
+| `/approve`  | On `review-2-active`, by the assigned second reviewer | Marks the review complete; if maintainer email settings are configured, automation then moves the tracked folder or file to `reviews/completed/`, emails the configured recipient, and closes the issue |
 
-**Integrity rule:** the second reviewer **cannot** be the same person as the first reviewer. The workflow checks this automatically.
+**Integrity rule:** the second reviewer **cannot** be the same person as the first reviewer when `reviewer_1` is recorded. The workflow checks this automatically for folder-based items with `metadata.yml`.
 
 ---
 
@@ -55,11 +55,11 @@ state: awaiting-review-2
 
 ## Doing a second review
 
-1. Find an `awaiting-review-2` issue and comment `/checkout`. (You'll be blocked if you were the first reviewer.)
+1. Find an `awaiting-review-2` issue and comment `/checkout`. (You'll be blocked if you were the first reviewer when that reviewer is recorded in metadata.)
 2. Independently re-run the notebook, verify it matches the manuscript's claims.
-3. If there are changes, open a PR adding `review2.md` to the folder with your notes.
+3. If there are changes, open a PR with your updates. For folder-based items, add `review2.md` to the folder with your notes.
 4. Comment `/approve` on the issue.
-5. Done — the package is auto-zipped and emailed; the issue closes.
+5. Your reviewer task ends there. If maintainer email delivery is configured, automation finalizes the tracked review folder or standalone file and closes the issue.
 
 ---
 

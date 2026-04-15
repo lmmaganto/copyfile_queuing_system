@@ -12,7 +12,7 @@ Each submission is represented by a GitHub issue. Reviewers interact with the qu
 |---|---|
 | `/checkout` | Claim an item and move it into an active review state |
 | `/release` | Return an item to the queue if you cannot continue |
-| `/approve` | Complete the second review and finalize the package |
+| `/approve` | Complete the second review; downstream completion steps depend on repository automation and maintainer configuration |
 
 The queue moves through these stages:
 
@@ -30,9 +30,9 @@ Once that work is merged, the item moves to `awaiting-review-2` so a second revi
 
 The second reviewer claims an item that is waiting for a follow-up review, re-runs or verifies the materials, and confirms that the package is complete.
 
-The system prevents the same person from acting as both reviewer 1 and reviewer 2 on the same submission.
+The system prevents the same person from acting as both reviewer 1 and reviewer 2 when the first reviewer is recorded in the review metadata.
 
-When the second reviewer approves the item, the workflow marks it complete, closes the issue, and sends the final package to the configured recipient.
+When the second reviewer approves the item, the reviewer workflow is finished. If the maintainer has configured email delivery, repository automation then marks the tracked folder or standalone file complete, closes the issue, and sends the package to the configured recipient.
 
 ## Why this is useful
 
