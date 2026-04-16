@@ -27,28 +27,33 @@ jobs:
             const { execSync } = require('child_process');
 
             const issue = context.payload.issue;
-            const m = (issue.body || '').match(/<!--\s*folder:\s*(.+?)\s*-->/);
-            if (!m) {
-              core.setFailed('Issue body has no <!-- folder: ... --> marker.');
+            const folderMatch = (issue.body || '').match(/<!--\s*folder:\s*(.+?)\s*-->/);
+            const pathMatch = (issue.body || '').match(/<!--\s*path:\s*(.+?)\s*-->/);
+            const src = folderMatch ? folderMatch[1] : (pathMatch ? pathMatch[1] : null);
+            if (!src) {
+              core.setFailed('Issue body has no <!-- folder: ... --> or <!-- path: ... --> marker.');
               return;
             }
-            const src = m[1];
             if (!fs.existsSync(src)) {
-              core.setFailed(`Folder ${src} not found.`);
+              core.setFailed(`Tracked item ${src} not found.`);
               return;
             }
-            const name = path.basename(src);
-            const dest = `reviews/completed/${name}`;
+            const stat = fs.statSync(src);
+            const isDirectory = stat.isDirectory();
+            const itemName = path.basename(src);
+            const dest = src.startsWith('reviews/completed/')
+              ? src
+              : `reviews/completed/${itemName}`;
 
-            // Move folder if not already in completed/
+            // Move the tracked item if it is not already in completed/.
             if (!src.startsWith('reviews/completed/')) {
               fs.mkdirSync('reviews/completed', { recursive: true });
               execSync(`git mv "${src}" "${dest}"`);
             }
 
-            // Update metadata.yml
-            const metaPath = path.join(dest, 'metadata.yml');
-            if (fs.existsSync(metaPath)) {
+            // Update metadata.yml when this completion item is a folder package.
+            const metaPath = isDirectory ? path.join(dest, 'metadata.yml') : null;
+            if (metaPath && fs.existsSync(metaPath)) {
               let yml = fs.readFileSync(metaPath, 'utf8');
               const reviewer2 = (issue.assignees || []).map(a => a.login).find(u => true) || 'unknown';
               yml = yml.replace(/^reviewer_2:.*$/m, `reviewer_2: ${reviewer2}`);
@@ -59,30 +64,39 @@ jobs:
               fs.writeFileSync(metaPath, yml);
             }
 
-            // Commit the move + metadata change
+            // Commit the move and any metadata change when there is something to save.
             execSync('git config user.name "github-actions[bot]"');
             execSync('git config user.email "41898282+github-actions[bot]@users.noreply.github.com"');
             execSync(`git add -A`);
-            execSync(`git commit -m "Finalize review: ${name} (closes #${issue.number})"`);
-            execSync('git push');
+            const pending = execSync('git status --short').toString().trim();
+            if (pending) {
+              execSync(`git commit -m "Finalize review: ${itemName} (closes #${issue.number})"`);
+              execSync('git push');
+            }
 
-            // Update issue body marker so the new path is recorded
-            const newBody = (issue.body || '').replace(
-              /<!--\s*folder:.+?-->/,
-              `<!-- folder: ${dest} -->`
-            );
+            // Update issue body markers so the completed location is recorded.
+            let newBody = issue.body || '';
+            if (folderMatch) {
+              newBody = newBody.replace(/<!--\s*folder:.+?-->/, `<!-- folder: ${dest} -->`);
+            }
+            if (pathMatch) {
+              newBody = newBody.replace(/<!--\s*path:.+?-->/, `<!-- path: ${dest} -->`);
+            }
             await github.rest.issues.update({
               ...context.repo, issue_number: issue.number, body: newBody,
             });
 
-            core.setOutput('folder', dest);
-            core.setOutput('name', name);
+            core.setOutput('item_path', dest);
+            core.setOutput('item_name', itemName);
+            core.setOutput('item_type', isDirectory ? 'folder' : 'file');
+            core.setOutput('package_parent', path.dirname(dest));
+            core.setOutput('package_name', itemName);
 
-      - name: Zip completed folder
+      - name: Zip completed item
         if: success()
         run: |
-          cd "${{ steps.resolve.outputs.folder }}/.." && \
-          zip -r "/tmp/${{ steps.resolve.outputs.name }}.zip" "${{ steps.resolve.outputs.name }}"
+          cd "${{ steps.resolve.outputs.package_parent }}" && \
+          zip -r "/tmp/${{ steps.resolve.outputs.item_name }}.zip" "${{ steps.resolve.outputs.package_name }}"
 
       - name: Email completed package
         if: success()
@@ -94,16 +108,17 @@ jobs:
           password: ${{ secrets.SMTP_PASS }}
           from: SDE Review Queue <${{ secrets.SMTP_USER }}>
           to: ${{ secrets.NOTIFY_TO }}
-          subject: "[SDE Review Complete] ${{ steps.resolve.outputs.name }}"
+          subject: "[SDE Review Complete] ${{ steps.resolve.outputs.item_name }}"
           body: |
             A review has been finalized.
 
-            Manuscript: ${{ steps.resolve.outputs.name }}
+            Manuscript: ${{ steps.resolve.outputs.item_name }}
             Issue: ${{ github.event.issue.html_url }}
-            Folder: ${{ steps.resolve.outputs.folder }}
+            Item: ${{ steps.resolve.outputs.item_path }}
+            Type: ${{ steps.resolve.outputs.item_type }}
 
             The complete review package is attached.
-          attachments: /tmp/${{ steps.resolve.outputs.name }}.zip
+          attachments: /tmp/${{ steps.resolve.outputs.item_name }}.zip
 
       - name: Notify reviewers + close issue
         if: success()
@@ -111,17 +126,23 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const folder = '${{ steps.resolve.outputs.folder }}';
+            const itemPath = '${{ steps.resolve.outputs.item_path }}';
+            const itemType = '${{ steps.resolve.outputs.item_type }}';
             let r1 = 'unknown', r2 = 'unknown';
             try {
-              const yml = fs.readFileSync(`${folder}/metadata.yml`, 'utf8');
-              r1 = (yml.match(/^reviewer_1:\s*(.+)$/m) || [])[1] || r1;
-              r2 = (yml.match(/^reviewer_2:\s*(.+)$/m) || [])[1] || r2;
+              if (itemType === 'folder') {
+                const yml = fs.readFileSync(`${itemPath}/metadata.yml`, 'utf8');
+                r1 = (yml.match(/^reviewer_1:\s*(.+)$/m) || [])[1] || r1;
+                r2 = (yml.match(/^reviewer_2:\s*(.+)$/m) || [])[1] || r2;
+              }
             } catch (_) {}
+            if (r2 === 'unknown') {
+              r2 = (context.payload.issue.assignees || []).map(a => a.login).find(u => true) || r2;
+            }
             await github.rest.issues.createComment({
               ...context.repo,
               issue_number: context.issue.number,
-              body: `Review **complete** and emailed.\n\n- First reviewer: @${r1}\n- Second reviewer: @${r2}\n- Package: \`${folder}\`\n\nThanks both!`,
+              body: `Review **complete** and emailed.\n\n- First reviewer: ${r1 === 'unknown' ? 'not recorded' : `@${r1}`}\n- Second reviewer: ${r2 === 'unknown' ? 'not recorded' : `@${r2}`}\n- Completed item: \`${itemPath}\`\n- Type: ${itemType}\n\nThanks both!`,
             });
             await github.rest.issues.update({
               ...context.repo, issue_number: context.issue.number, state: 'closed',
