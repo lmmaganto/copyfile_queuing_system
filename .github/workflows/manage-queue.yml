@@ -167,15 +167,52 @@ jobs:
                   await reply(`Could not move the tracked item into \`reviews/in-progress/\`: ${err.message}`);
                   return;
                 }
-                await setLabels(['review-2-active'], ['awaiting-review-2', 'complete']);
+                await setLabels(['review-2-active'], ['awaiting-review-2', 'complete']); // Auto-copy curator notebook for R2
+                if (isFolderItem) {
+                  const metaPath = path.join(activePath, 'metadata.yml');
+                  if (fs.existsSync(metaPath)) {
+                      const meta = fs.readFileSync(metaPath, 'utf8');
+
+                        // Read notebook name from metadata
+                      const notebookMatch = meta.match(/^notebook:\s*(.+?)\s*$/m);
+                      const notebookName = notebookMatch ? notebookMatch[1] : null;
+
+                      // Update reviewer_2 in metadata
+                      const updatedMeta = meta.replace(
+                      /^reviewer_2:\s*.*$/m,
+                      `reviewer_2: ${commenter}`
+                    );
+                    fs.writeFileSync(metaPath, updatedMeta);
+
+                    if (notebookName) {
+                        const r1Path = path.join(activePath, notebookName);
+                        const r2Path = path.join(activePath, 'r2_notebook.ipynb');
+                        if (fs.existsSync(r1Path) && !fs.existsSync(r2Path)) {
+                        fs.copyFileSync(r1Path, r2Path);
+                        execFileSync('git', ['add', r2Path]);
+                        execFileSync('git', ['add', metaPath]);
+                        execFileSync('git', ['commit', '-m',
+                            `Review copy: r2_notebook created for @${commenter} (refs #${issue.number})`
+                         ]);
+                          execFileSync('git', ['push']);
+                        }
+                    }
+                 }
+              }
+                
+                
+                
                 const itemSummary = isFolderItem
                   ? `This issue is linked to the review folder \`${activePath}\`.`
                   : isFileItem
                     ? `This issue is linked to the standalone review file \`${activePath}\`.`
                     : `This issue is linked to \`${activePath}\`.`;
+                
                 await reply(`@${commenter} checked out for **second review**. The tracked item was moved to \`reviews/in-progress/\` and the issue is now \`review-2-active\`. ${itemSummary} ${reviewerLine} When done, comment \`/approve\` to move it to completed, or \`/release\` to return it to \`awaiting-review-2\`.`);
                 return;
               }
+              
+              
               await reply(`This item is not currently checkable-out (state: \`${labels.join(', ')}\`).`);
               return;
             }
