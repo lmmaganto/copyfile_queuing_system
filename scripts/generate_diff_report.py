@@ -17,8 +17,7 @@ def parse_notebook(path):
                 'type': 'markdown',
                 'source': source,
                 'code': None,
-                'source_cite': None,
-                'changed_reason': None
+                'changes': []
             })
             continue
         if cell['cell_type'] != 'code':
@@ -27,30 +26,41 @@ def parse_notebook(path):
         if not source.strip():
             continue
         source_cite = None
-        changed_reasons = []
+        changes = []
         code_lines = []
+        current_reason = None
         for line in source.splitlines():
             if line.strip().startswith('# SOURCE:'):
                 source_cite = line.replace('# SOURCE:', '').strip()
             else:
                 match = re.search(r'#\s*CHANGED:\s*(.*)', line, re.IGNORECASE)
                 if match:
-                    reason = match.group(1).strip()
-                    if reason:
-                        changed_reasons.append(reason)
+                    current_reason = match.group(1).strip()
                     code_part = line[:re.search(r'#\s*CHANGED:', line, re.IGNORECASE).start()].rstrip()
                     if code_part.strip():
+                        changes.append({
+                            'line': code_part.strip(),
+                            'reason': current_reason
+                        })
                         code_lines.append(code_part)
+                    else:
+                        # reason is above the code line — attach to next code line
+                        changes.append({
+                            'line': None,
+                            'reason': current_reason
+                        })
                 else:
+                    # if previous line was a CHANGED comment with no code, attach this line
+                    if changes and changes[-1]['line'] is None:
+                        changes[-1]['line'] = line.strip()
                     code_lines.append(line)
-        changed_reason = ' | '.join(changed_reasons) if changed_reasons else None
         cells.append({
             'index': i,
             'type': 'code',
             'source': source,
             'code': '\n'.join(code_lines).strip(),
             'source_cite': source_cite,
-            'changed_reason': changed_reason
+            'changes': changes
         })
     return cells
 
@@ -122,17 +132,20 @@ def generate_report(folder_path):
 
     agreed = []
     disagreed = []
+    total_changes = 0
 
     for c1, c2 in zip(r1_code, r2_code):
         if c1['code'] == c2['code']:
             agreed.append(c1)
         else:
+            cell_changes = c2['changes'] if c2['changes'] else []
+            total_changes += len(cell_changes) if cell_changes else 1
             disagreed.append({
                 'cell': c1['index'],
                 'source_cite': c1['source_cite'] or c2['source_cite'] or 'no citation',
                 'r1_code': c1['code'],
                 'r2_code': c2['code'],
-                'changed_reason': c2['changed_reason']
+                'changes': cell_changes
             })
 
     now = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
@@ -152,8 +165,9 @@ def generate_report(folder_path):
         f'| | Count |',
         f'|---|---|',
         f'| Cells compared | {len(r1_code)} |',
-        f'| Agreed | {len(agreed)} |',
-        f'| Differences | {len(disagreed)} |',
+        f'| Cells agreed | {len(agreed)} |',
+        f'| Cells with differences | {len(disagreed)} |',
+        f'| Total individual changes | {total_changes} |',
         f'',
     ]
 
@@ -170,7 +184,7 @@ def generate_report(folder_path):
             f'',
         ]
 
-    lines += [f'## Agreements ({len(agreed)})', f'']
+    lines += [f'## Agreements ({len(agreed)} cells)', f'']
     if agreed:
         lines.append('The following cells matched exactly between curator and reviewer.')
         lines.append('')
@@ -178,7 +192,8 @@ def generate_report(folder_path):
         lines.append('No agreements found.')
         lines.append('')
 
-    lines += [f'---', f'', f'## Differences ({len(disagreed)})', f'']
+    lines += [f'---', f'', f'## Differences ({total_changes} individual changes across {len(disagreed)} cells)', f'']
+
     for d in disagreed:
         lines += [
             f"### Cell {d['cell']} — {d['source_cite']}",
@@ -194,17 +209,52 @@ def generate_report(folder_path):
             f'```',
             f'',
         ]
-        if d['changed_reason']:
-            lines += [f"**Reason:** {d['changed_reason']}", f'']
+        if d['changes']:
+            lines.append(f'**Changes ({len(d["changes"])}):**')
+            lines.append('')
+            for i, change in enumerate(d['changes'], 1):
+                line_text = f'`{change["line"]}`' if change['line'] else 'see code above'
+                reason_text = change['reason'] if change['reason'] else 'no reason provided'
+                lines.append(f'{i}. {line_text} — {reason_text}')
+            lines.append('')
         else:
-            lines += [f'**Reason:** not provided', f'']
+            lines.append('**Reason:** not provided')
+            lines.append('')
+
+    # Write curator notification summary at bottom
+    lines += [
+        f'---',
+        f'',
+        f'## Curator notification',
+        f'',
+        f'@{curator} — your submission has been second reviewed by @{reviewer}.',
+        f'',
+    ]
+    if total_changes == 0:
+        lines.append('All cells agreed — no differences found.')
+    else:
+        lines.append(f'{total_changes} change(s) were made across {len(disagreed)} cell(s):')
+        lines.append('')
+        for d in disagreed:
+            for change in d['changes']:
+                line_text = change['line'] if change['line'] else 'see diff'
+                reason_text = change['reason'] if change['reason'] else 'no reason provided'
+                lines.append(f'- `{line_text}` — {reason_text}')
+    lines.append('')
 
     report_path = folder / 'DIFF_REPORT.md'
     with open(report_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
     print(f'Report written to {report_path}')
-    print(f'{len(agreed)} agreements, {len(disagreed)} differences')
+    print(f'{len(agreed)} agreements, {total_changes} individual changes across {len(disagreed)} cells')
+    
+    return {
+        'curator': curator,
+        'title': title,
+        'total_changes': total_changes,
+        'disagreed': disagreed
+    }
 
 
 if __name__ == '__main__':
