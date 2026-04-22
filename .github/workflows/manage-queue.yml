@@ -16,20 +16,20 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: pip install nbformat
+
       - name: Verify commenter is an authorized reviewer
         id: auth
         uses: actions/github-script@v7
         with:
           script: |
             const commenter = context.payload.comment.user.login;
-            // TODO: switch to team check after transfer to org.
-            // Replace the block below with:
-            //   const team = process.env.REVIEWER_TEAM;     // e.g. "sde-reviewers"
-            //   const org  = context.repo.owner;
-            //   const { data } = await github.rest.teams.getMembershipForUserInOrg({
-            //     org, team_slug: team, username: commenter,
-            //   });
-            //   if (data.state !== 'active') throw new Error('not a team member');
             try {
               await github.rest.repos.checkCollaborator({
                 owner: context.repo.owner,
@@ -39,7 +39,7 @@ jobs:
             } catch (e) {
               await github.rest.issues.createComment({
                 ...context.repo, issue_number: context.issue.number,
-                body: `@${commenter} sorry — only authorized reviewers can run slash commands here.`,
+                body: `@${commenter} sorry - only authorized reviewers can run slash commands here.`,
               });
               core.setFailed('unauthorized');
               return;
@@ -145,15 +145,15 @@ jobs:
             if (cmd === '/checkout') {
               if (labels.includes('awaiting-review-2')) {
                 if (!trackedPath) {
-                  await reply(`Could not determine which repository item this issue tracks (missing \`<!-- folder: ... -->\` or \`<!-- path: ... -->\` marker). Aborting checkout — contact the maintainer.`);
+                  await reply(`Could not determine which repository item this issue tracks (missing \`<!-- folder: ... -->\` or \`<!-- path: ... -->\` marker). Aborting checkout - contact the maintainer.`);
                   return;
                 }
                 if (!hasTrackedPath) {
-                  await reply(`The tracked item for this issue was not found at \`${trackedPath}\`. Aborting checkout — contact the maintainer.`);
+                  await reply(`The tracked item for this issue was not found at \`${trackedPath}\`. Aborting checkout - contact the maintainer.`);
                   return;
                 }
                 if (reviewer1 && reviewer1 === commenter) {
-                  await reply(`@${commenter} you were the **first reviewer** for this item — a different reviewer must perform the second review.`);
+                  await reply(`@${commenter} you were the **first reviewer** for this item - a different reviewer must perform the second review.`);
                   return;
                 }
                 await github.rest.issues.addAssignees({
@@ -167,52 +167,47 @@ jobs:
                   await reply(`Could not move the tracked item into \`reviews/in-progress/\`: ${err.message}`);
                   return;
                 }
-                await setLabels(['review-2-active'], ['awaiting-review-2', 'complete']); // Auto-copy curator notebook for R2
+
+                // Auto-copy curator notebook for R2
                 if (isFolderItem) {
                   const metaPath = path.join(activePath, 'metadata.yml');
                   if (fs.existsSync(metaPath)) {
-                      const meta = fs.readFileSync(metaPath, 'utf8');
-
-                        // Read notebook name from metadata
-                      const notebookMatch = meta.match(/^notebook:\s*(.+?)\s*$/m);
-                      const notebookName = notebookMatch ? notebookMatch[1] : null;
-
-                      // Update reviewer_2 in metadata
-                      const updatedMeta = meta.replace(
+                    const meta = fs.readFileSync(metaPath, 'utf8');
+                    const notebookMatch = meta.match(/^notebook:\s*(.+?)\s*$/m);
+                    const notebookName = notebookMatch ? notebookMatch[1] : null;
+                    const updatedMeta = meta.replace(
                       /^reviewer_2:\s*.*$/m,
                       `reviewer_2: ${commenter}`
                     );
                     fs.writeFileSync(metaPath, updatedMeta);
-
                     if (notebookName) {
-                        const r1Path = path.join(activePath, notebookName);
-                        const r2Path = path.join(activePath, 'r2_notebook.ipynb');
-                        if (fs.existsSync(r1Path) && !fs.existsSync(r2Path)) {
+                      const r1Path = path.join(activePath, notebookName);
+                      const r2Path = path.join(activePath, 'r2_notebook.ipynb');
+                      if (fs.existsSync(r1Path) && !fs.existsSync(r2Path)) {
                         fs.copyFileSync(r1Path, r2Path);
                         execFileSync('git', ['add', r2Path]);
                         execFileSync('git', ['add', metaPath]);
                         execFileSync('git', ['commit', '-m',
-                            `Review copy: r2_notebook created for @${commenter} (refs #${issue.number})`
-                         ]);
-                          execFileSync('git', ['push']);
-                        }
+                          'Review copy: r2_notebook created for @' + commenter + ' (refs #' + issue.number + ')'
+                        ]);
+                        execFileSync('git', ['push']);
+                      }
                     }
-                 }
-              }
-                
-                
-                
+                  }
+                }
+
+                await setLabels(['review-2-active'], ['awaiting-review-2', 'complete']);
                 const itemSummary = isFolderItem
                   ? `This issue is linked to the review folder \`${activePath}\`.`
                   : isFileItem
                     ? `This issue is linked to the standalone review file \`${activePath}\`.`
                     : `This issue is linked to \`${activePath}\`.`;
-                
-                await reply(`@${commenter} checked out for **second review**. The tracked item was moved to \`reviews/in-progress/\` and the issue is now \`review-2-active\`. ${itemSummary} ${reviewerLine} When done, comment \`/approve\` to move it to completed, or \`/release\` to return it to \`awaiting-review-2\`.`);
+                const notebookMsg = isFolderItem
+                  ? `\n\nYour copy is ready at \`${activePath}/r2_notebook.ipynb\`. Open this file - do not edit the original. Add \`#SOURCE: p.X\` where you found each value, and \`#CHANGED: reason\` above anything you change.`
+                  : '';
+                await reply(`@${commenter} checked out for **second review**. The tracked item was moved to \`reviews/in-progress/\` and the issue is now \`review-2-active\`. ${itemSummary} ${reviewerLine}${notebookMsg} When done, comment \`/approve\` to move it to completed, or \`/release\` to return it to \`awaiting-review-2\`.`);
                 return;
               }
-              
-              
               await reply(`This item is not currently checkable-out (state: \`${labels.join(', ')}\`).`);
               return;
             }
@@ -259,8 +254,70 @@ jobs:
                 await reply(`@${commenter} integrity check failed: you are recorded as the first reviewer.`);
                 return;
               }
+
+              // Move to completed first
+              let completedPath = trackedPath;
+              if (trackedPath && hasTrackedPath) {
+                try {
+                  const moved = await moveTrackedItemToStage(trackedPath, 'completed');
+                  completedPath = moved.path;
+                } catch (err) {
+                  await reply(`Could not move to completed: ${err.message}`);
+                  return;
+                }
+              }
+
+              // Run diff report if this is a folder with review_metadata.yml
+              let diffSummary = '';
+              if (isFolderItem && completedPath) {
+                const metaPath = path.join(completedPath, 'review_metadata.yml');
+                if (fs.existsSync(metaPath)) {
+                  try {
+                    // Update approval info in metadata
+                    let meta = fs.readFileSync(metaPath, 'utf8');
+                    meta = meta.replace(/^approval_timestamp:.*$/m, `approval_timestamp: "${new Date().toISOString()}"`);
+                    meta = meta.replace(/^approved_by:.*$/m, `approved_by: "${commenter}"`);
+                    meta = meta.replace(/^status:.*$/m, `status: "completed"`);
+                    fs.writeFileSync(metaPath, meta);
+
+                    // Run diff script
+                    const result = execFileSync('python', [
+                      'scripts/generate_diff_report.py',
+                      completedPath
+                    ]).toString().trim();
+
+                    console.log('Diff result:', result);
+
+                    // Read the curator notification from the report
+                    const reportPath = path.join(completedPath, 'DIFF_REPORT.md');
+                    if (fs.existsSync(reportPath)) {
+                      const report = fs.readFileSync(reportPath, 'utf8');
+                      const notifMatch = report.match(/## Curator notification\n([\s\S]*?)$/);
+                      if (notifMatch) {
+                        diffSummary = notifMatch[1].trim();
+                      }
+                    }
+
+                    // Commit report
+                    execFileSync('git', ['add', completedPath]);
+                    execFileSync('git', ['commit', '-m',
+                      'Diff report: ' + path.basename(completedPath) + ' (refs #' + issue.number + ')'
+                    ]);
+                    execFileSync('git', ['push']);
+
+                  } catch (err) {
+                    console.log('Diff report error:', err.message);
+                    diffSummary = 'Diff report could not be generated - run manually with `python scripts/generate_diff_report.py ' + completedPath + '`';
+                  }
+                }
+              }
+
               await setLabels(['complete'], ['review-2-active']);
-              await reply(`Approved by @${commenter}. The review is now marked complete. If this issue is linked to a tracked review folder or file and maintainer email settings are configured, the completion workflow will attempt finalization.`);
-              // notify-on-complete.yml takes over from here on the 'complete' label.
+
+              const approvalMsg = diffSummary
+                ? `Approved by @${commenter}. Review is complete.\n\n---\n\n${diffSummary}\n\nFull report: \`${completedPath}/DIFF_REPORT.md\``
+                : `Approved by @${commenter}. The review is now marked complete.`;
+
+              await reply(approvalMsg);
               return;
             }
