@@ -2,8 +2,8 @@ FROM continuumio/miniconda3:latest
 
 WORKDIR /workspace
 
-# Copy the conda environment spec from curation-dev
-COPY curation-dev/setup/env.yml /tmp/env.yml
+# Copy the conda environment spec
+COPY env.yml /tmp/env.yml
 
 # Create the environment and clean up to keep image size down
 RUN conda env create -f /tmp/env.yml && \
