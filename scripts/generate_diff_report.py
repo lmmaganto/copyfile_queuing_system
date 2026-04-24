@@ -74,9 +74,9 @@ def extract_markdown_fields(source):
     return fields
 
 
-def get_line_diff(r1_code, r2_code):
-    r1_lines = r1_code.splitlines()
-    r2_lines = r2_code.splitlines()
+def get_line_diff(r1_source, r2_source):
+    r1_lines = r1_source.splitlines()
+    r2_lines = r2_source.splitlines()
     diff = list(unified_diff(
         r1_lines,
         r2_lines,
@@ -143,7 +143,7 @@ def generate_report(folder_path):
         if c1['code'] == c2['code']:
             agreed.append(c1)
         else:
-            removed, added, raw_diff = get_line_diff(c1['code'], c2['code'])
+            removed, added, raw_diff = get_line_diff(c1['source'], c2['source'])
             reasons = c2['changed_reasons']
             total_changes += max(len(removed), len(added), 1)
             disagreed.append({
@@ -207,12 +207,11 @@ def generate_report(folder_path):
             f'',
         ]
 
-        # Show only changed lines with + and - markers
+        # Show diff with 2 lines of context above and below each change
         lines += ['```diff']
-        for removed_line in d['removed']:
-            lines.append(f'- {removed_line}')
-        for added_line in d['added']:
-            lines.append(f'+ {added_line}')
+        for l in d['raw_diff']:
+            if not l.startswith('---') and not l.startswith('+++'):
+                lines.append(l)
         lines += ['```', '']
 
         # Show reasons if provided
