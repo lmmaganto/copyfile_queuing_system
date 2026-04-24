@@ -1,12 +1,10 @@
 import sys
 import json
 import re
-import difflib
 from pathlib import Path
 from datetime import datetime
+from difflib import unified_diff
 
-# Ensure UTF-8 output for Windows/GitHub Action environments
-sys.stdout.reconfigure(encoding='utf-8')
 
 def parse_notebook(path):
     with open(path, 'r', encoding='utf-8') as f:
@@ -23,55 +21,41 @@ def parse_notebook(path):
                 'changes': []
             })
             continue
-            
         if cell['cell_type'] != 'code':
             continue
-            
         source = ''.join(cell['source'])
         if not source.strip():
             continue
-
         source_cite = None
-        changes = []
+        changed_reasons = []
         code_lines = []
-        
         for line in source.splitlines():
-            # Extract Citation
             if re.search(r'#\s*SOURCE:', line, re.IGNORECASE):
                 source_cite = re.sub(r'#\s*SOURCE:\s*', '', line, flags=re.IGNORECASE).strip()
-                code_lines.append(line)
-            # Extract Changes
             else:
                 match = re.search(r'#\s*CHANGED:\s*(.*)', line, re.IGNORECASE)
                 if match:
                     reason = match.group(1).strip()
-                    code_part = line[:match.start()].rstrip()
-                    
+                    if reason:
+                        changed_reasons.append(reason)
+                    code_part = line[:re.search(r'#\s*CHANGED:', line, re.IGNORECASE).start()].rstrip()
                     if code_part.strip():
-                        changes.append({'line': code_part.strip(), 'reason': reason})
-                        code_lines.append(line) # Keep the full line for diffing
-                    else:
-                        # Reason is above the code, mark it for the next line
-                        changes.append({'line': None, 'reason': reason})
-                        code_lines.append(line)
+                        code_lines.append(code_part)
                 else:
-                    # Attach previous 'above-line' reason if it exists
-                    if changes and changes[-1]['line'] is None:
-                        changes[-1]['line'] = line.strip()
                     code_lines.append(line)
-
         cells.append({
             'index': i,
             'type': 'code',
             'source': source,
             'code': '\n'.join(code_lines).strip(),
             'source_cite': source_cite,
-            'changes': changes
+            'changed_reasons': changed_reasons
         })
     return cells
 
+
 def parse_metadata(path):
-    with open(path, 'r', encoding='utf-8') as f:
+    with open(path, 'r') as f:
         content = f.read()
     meta = {}
     for line in content.splitlines():
@@ -79,6 +63,7 @@ def parse_metadata(path):
             key, _, value = line.partition(':')
             meta[key.strip()] = value.strip().strip('"')
     return meta
+
 
 def extract_markdown_fields(source):
     fields = {}
@@ -88,12 +73,28 @@ def extract_markdown_fields(source):
             fields[key.strip()] = value.strip()
     return fields
 
+
+def get_line_diff(r1_code, r2_code):
+    r1_lines = r1_code.splitlines()
+    r2_lines = r2_code.splitlines()
+    diff = list(unified_diff(
+        r1_lines,
+        r2_lines,
+        lineterm='',
+        fromfile='curator',
+        tofile='reviewer'
+    ))
+    removed = [l[1:].strip() for l in diff if l.startswith('-') and not l.startswith('---')]
+    added = [l[1:].strip() for l in diff if l.startswith('+') and not l.startswith('+++')]
+    return removed, added, diff
+
+
 def generate_report(folder_path):
     folder = Path(folder_path)
     meta_path = folder / 'review_metadata.yml'
 
     if not meta_path.exists():
-        print(f'Error: review_metadata.yml not found in {folder}')
+        print(f'No review_metadata.yml found in {folder}')
         return
 
     meta = parse_metadata(meta_path)
@@ -104,90 +105,167 @@ def generate_report(folder_path):
     original_path = folder / 'original' / original_name
     review_path = folder / 'review-copy' / review_name
 
-    if not original_path.exists() or not review_path.exists():
-        print(f'Missing notebooks in {folder}')
+    if not original_path.exists():
+        print(f'Original notebook not found: {original_path}')
+        return
+    if not review_path.exists():
+        print(f'Review notebook not found: {review_path}')
         return
 
     r1_cells = parse_notebook(original_path)
     r2_cells = parse_notebook(review_path)
 
-    r1_meta = extract_markdown_fields(r1_cells[0]['source']) if r1_cells else {}
-    r2_meta = extract_markdown_fields(r2_cells[0]['source']) if r2_cells else {}
+    r1_meta = {}
+    r2_meta = {}
+    if r1_cells and r1_cells[0]['type'] == 'markdown':
+        r1_meta = extract_markdown_fields(r1_cells[0]['source'])
+    if r2_cells and r2_cells[0]['type'] == 'markdown':
+        r2_meta = extract_markdown_fields(r2_cells[0]['source'])
 
     curator = r1_meta.get('Curator', 'unknown')
     title = r1_meta.get('Title', 'Unknown paper')
-    
-    agreed = []
-    disagreed = []
-    
+    doi = r1_meta.get('DOI', '')
+    figure = r1_meta.get('Figure', '')
+    r1_outcome = r1_meta.get('Outcome', '')
+    r2_outcome = r2_meta.get('Outcome', '')
+    r1_notes = r1_meta.get('Notes', '')
+    r2_notes = r2_meta.get('Notes', '')
+
     r1_code = [c for c in r1_cells if c['type'] == 'code']
     r2_code = [c for c in r2_cells if c['type'] == 'code']
+
+    agreed = []
+    disagreed = []
+    total_changes = 0
 
     for c1, c2 in zip(r1_code, r2_code):
         if c1['code'] == c2['code']:
             agreed.append(c1)
         else:
+            removed, added, raw_diff = get_line_diff(c1['code'], c2['code'])
+            reasons = c2['changed_reasons']
+            total_changes += max(len(removed), len(added), 1)
             disagreed.append({
                 'cell': c1['index'],
-                'cite': c1['source_cite'] or c2['source_cite'] or 'No Citation',
-                'r1': c1['code'],
-                'r2': c2['code'],
-                'changes': c2['changes']
+                'source_cite': c1['source_cite'] or c2['source_cite'] or 'no citation',
+                'removed': removed,
+                'added': added,
+                'raw_diff': raw_diff,
+                'reasons': reasons
             })
 
-    # Build Markdown
     now = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
     lines = [
-        f'# 📝 Diff Report: {title}',
-        f'\n**Curator:** @{curator} | **Reviewer:** @{reviewer}',
-        f'\n**Generated:** {now}',
-        '\n---\n',
-        '## 📊 Summary',
-        f'\n| Metric | Count |',
-        f'| :--- | :--- |',
-        f'| Cells Matched | {len(agreed)} |',
-        f'| Cells Flagged | {len(disagreed)} |',
-        f'| **Total Changes** | **{sum(len(d["changes"]) for d in disagreed)}** |',
-        '\n---'
+        f'# Diff report - {title}',
+        f'',
+        f'**Curator:** @{curator}  ',
+        f'**Reviewer:** @{reviewer}  ',
+        f'**DOI:** {doi}  ',
+        f'**Figure:** {figure}  ',
+        f'**Generated:** {now}  ',
+        f'',
+        f'---',
+        f'',
+        f'## Summary',
+        f'',
+        f'| | Count |',
+        f'|---|---|',
+        f'| Cells compared | {len(r1_code)} |',
+        f'| Cells agreed | {len(agreed)} |',
+        f'| Cells with differences | {len(disagreed)} |',
+        f'| Total lines changed | {total_changes} |',
+        f'',
     ]
 
-    if not disagreed:
-        lines.append('\n✅ **Perfect Match:** No differences found between Curator and Reviewer.')
+    if r1_outcome != r2_outcome or r1_notes != r2_notes:
+        lines += [
+            f'## Metadata changes',
+            f'',
+            f'| Field | Curator | Reviewer |',
+            f'|---|---|---|',
+            f'| Outcome | {r1_outcome} | {r2_outcome} |',
+            f'| Notes | {r1_notes} | {r2_notes} |',
+            f'',
+            f'---',
+            f'',
+        ]
+
+    lines += [f'## Agreements ({len(agreed)} cells)', f'']
+    if agreed:
+        lines.append('The following cells matched exactly between curator and reviewer.')
+        lines.append('')
     else:
-        lines.append('\n## 🔍 Detected Differences\n')
-        for d in disagreed:
-            lines.append(f"### 📍 Cell {d['cell']} — {d['cite']}")
-            lines.append('\n| Side | Line Content |')
-            lines.append('| :--- | :--- |')
-            
-            diff = difflib.ndiff(d['r1'].splitlines(), d['r2'].splitlines())
-            for line in diff:
-                if line.startswith('- '):
-                    lines.append(f'| ~~Original~~ | ` {line[2:].strip()} ` |')
-                elif line.startswith('+ '):
-                    clean_line = line[2:].strip()
-                    display = f'**`{clean_line}`**' if "#CHANGED:" in clean_line else f'`{clean_line}`'
-                    lines.append(f'| **Reviewer** | {display} |')
-            
-            if d['changes']:
-                lines.append('\n**Reasoning:**')
-                for c in d['changes']:
-                    lines.append(f"- {c['reason']}")
-            lines.append('\n---')
+        lines.append('No agreements found.')
+        lines.append('')
 
-    # Footer for Curator
+    lines += [f'---', f'', f'## Differences ({total_changes} lines changed across {len(disagreed)} cells)', f'']
+
+    for d in disagreed:
+        lines += [
+            f"### Cell {d['cell']} - {d['source_cite']}",
+            f'',
+        ]
+
+        # Show only changed lines with + and - markers
+        lines += ['```diff']
+        for removed_line in d['removed']:
+            lines.append(f'- {removed_line}')
+        for added_line in d['added']:
+            lines.append(f'+ {added_line}')
+        lines += ['```', '']
+
+        # Show reasons if provided
+        if d['reasons']:
+            lines.append(f'**Reasons ({len(d["reasons"])}):**')
+            lines.append('')
+            for i, reason in enumerate(d['reasons'], 1):
+                lines.append(f'{i}. {reason}')
+            lines.append('')
+        else:
+            lines.append('**Reason:** not provided')
+            lines.append('')
+
+    # Curator notification
     lines += [
-        '\n## 🔔 Curator Notification',
-        f'@{curator}: Please review the changes highlighted above by @{reviewer}.'
+        f'---',
+        f'',
+        f'## Curator notification',
+        f'',
+        f'@{curator} - your submission has been second reviewed by @{reviewer}.',
+        f'',
     ]
+    if total_changes == 0:
+        lines.append('All cells agreed - no differences found.')
+    else:
+        lines.append(f'{total_changes} line(s) changed across {len(disagreed)} cell(s):')
+        lines.append('')
+        for d in disagreed:
+            for i, (rem, add) in enumerate(zip(d['removed'], d['added'])):
+                reason = d['reasons'][i] if i < len(d['reasons']) else 'no reason provided'
+                lines.append(f'- `{rem}` changed to `{add}` - {reason}')
+            if len(d['added']) > len(d['removed']):
+                for add in d['added'][len(d['removed']):]:
+                    lines.append(f'- added `{add}`')
+            if len(d['removed']) > len(d['added']):
+                for rem in d['removed'][len(d['added']):]:
+                    lines.append(f'- removed `{rem}`')
+    lines.append('')
 
     report_path = folder / 'DIFF_REPORT.md'
     with open(report_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
-    print(f'Report successfully generated at {report_path}')
+    print(f'Report written to {report_path}')
+    print(f'{len(agreed)} agreements, {total_changes} lines changed across {len(disagreed)} cells')
+
+    return {
+        'curator': curator,
+        'title': title,
+        'total_changes': total_changes,
+        'disagreed': disagreed
+    }
+
 
 if __name__ == '__main__':
-    # Usage: python script.py path/to/folder
-    folder_arg = sys.argv[1] if len(sys.argv) > 1 else '.'
-    generate_report(folder_arg)
+    folder = sys.argv[1] if len(sys.argv) > 1 else 'reviews/completed/10_1007s00332.023_copy'
+    generate_report(folder)
