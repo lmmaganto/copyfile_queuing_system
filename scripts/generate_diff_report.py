@@ -82,7 +82,8 @@ def get_line_diff(r1_code, r2_code):
         r2_lines,
         lineterm='',
         fromfile='curator',
-        tofile='reviewer'
+        tofile='reviewer',
+        n=2
     ))
     removed = [l[1:].strip() for l in diff if l.startswith('-') and not l.startswith('---')]
     added = [l[1:].strip() for l in diff if l.startswith('+') and not l.startswith('+++')]
