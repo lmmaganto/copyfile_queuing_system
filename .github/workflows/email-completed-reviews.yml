@@ -56,6 +56,7 @@ jobs:
               msg['Subject'] = f'[SDE Review Complete] {folder_name}'
               msg['From']    = formataddr(('SDE Review Queue', from_email))
               msg['To']      = to_email
+              msg['Cc']      = from_email
               msg.set_content(
                   f"A review package has been finalized.\n\n"
                   f"Manuscript: {folder_name}\n"
