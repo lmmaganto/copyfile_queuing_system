@@ -30,6 +30,15 @@ There's also `/release` if you need to give something back to the queue.
 3. **Need the big picture?** See [How Reviewers Use This System](docs/USAGE.md)
 4. **Maintainer?** See [Setup](docs/SETUP.md) for one-time configuration
 
+## Important: Codespaces-Only Devcontainer
+
+This repository includes a devcontainer that is intentionally restricted to GitHub Codespaces.
+
+- In GitHub Codespaces: the container starts normally.
+- In local VS Code on your computer: do not choose "Reopen in Container" for this repository.
+
+If you accidentally choose it locally, container startup will fail by design.
+
 ## Where Files Live
 
 ```

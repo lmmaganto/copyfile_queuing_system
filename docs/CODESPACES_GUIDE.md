@@ -2,6 +2,8 @@
 
 This guide walks you through everything you need to know to work on this project using GitHub Codespaces. You do not need to install anything on your computer. Everything runs in your web browser.
 
+Important: this repository's devcontainer is configured for GitHub Codespaces use. If you are working in local desktop VS Code, follow [LOCAL_SETUP_GUIDE.md](LOCAL_SETUP_GUIDE.md) instead and do not reopen this repository in a container.
+
 ---
 
 ## What is a Codespace?
