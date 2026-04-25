@@ -49,12 +49,10 @@ jobs:
               const files = fs.readdirSync(folder);
               const hasNotebook = files.some(f => f.endsWith('.ipynb'));
               const hasPdf      = files.some(f => f.toLowerCase().endsWith('.pdf'));
-              const hasMeta     = files.includes('metadata.yml');
               const hasImage    = files.some(f => /\.(png|jpe?g|svg)$/i.test(f));
 
               if (!hasNotebook) errors.push(`\`${folder}\` is missing a \`.ipynb\` notebook.`);
               if (!hasPdf)      errors.push(`\`${folder}\` is missing a \`.pdf\` manuscript.`);
-              if (!hasMeta)     errors.push(`\`${folder}\` is missing \`metadata.yml\`.`);
               if (!hasImage)    core.warning(`${folder} has no output image — allowed but discouraged.`);
             }
 

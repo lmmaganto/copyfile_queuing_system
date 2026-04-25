@@ -119,6 +119,124 @@ jobs:
               return { moved: true, path: destPath };
             };
 
+            const findSingleNotebook = (folderPath) => {
+              const items = fs.readdirSync(folderPath);
+              const notebooks = items.filter(item => item.endsWith('.ipynb'));
+              if (notebooks.length === 0) throw new Error('No .ipynb notebook found in the review folder.');
+              if (notebooks.length > 1) throw new Error('Multiple .ipynb notebooks found; expected exactly one.');
+              return path.join(folderPath, notebooks[0]);
+            };
+
+            const createReviewStructure = (folderPath, notebookPath, reviewer, issueNumber) => {
+              const notebookName = path.basename(notebookPath);
+              const notebookBase = notebookName.replace(/\.ipynb$/, '');
+              const checkoutTimestamp = new Date().toISOString();
+              const paperFolder = path.basename(folderPath);
+
+              fs.mkdirSync(path.join(folderPath, 'original'), { recursive: true });
+              fs.mkdirSync(path.join(folderPath, 'review-copy'), { recursive: true });
+              fs.mkdirSync(path.join(folderPath, 'notes'), { recursive: true });
+
+              const originalPath = path.join(folderPath, 'original', notebookName);
+              fs.copyFileSync(notebookPath, originalPath);
+
+              const reviewCopyPath = path.join(folderPath, 'review-copy', `${notebookBase}_rvd.ipynb`);
+              fs.copyFileSync(notebookPath, reviewCopyPath);
+
+              const notesPath = path.join(folderPath, 'notes', 'review_notes.md');
+              const notesTemplate = `# Review Notes
+
+              - Reviewer: ${reviewer}
+              - Checkout Time: ${checkoutTimestamp}
+              - Paper Folder: ${paperFolder}
+              - Issue: #${issueNumber}
+
+              ## Summary
+
+              ## Required Changes
+
+              ## Comments
+
+              ## Decision
+              - [ ] Approved
+              - [ ] Needs Changes
+              `;
+              fs.writeFileSync(notesPath, notesTemplate);
+
+              const metadataPath = path.join(folderPath, 'review_metadata.yml');
+              const metadata = `paper_id: "${paperFolder}"
+              status: "in-progress"
+              reviewer: "${reviewer}"
+              checkout_timestamp: "${checkoutTimestamp}"
+              original_notebook: "${notebookName}"
+              review_copy_notebook: "${notebookBase}_rvd.ipynb"
+              approval_timestamp: null
+              approved_by: null
+            `;
+              fs.writeFileSync(metadataPath, metadata);
+            };
+
+            const validateReviewStructure = (folderPath) => {
+              const requiredDirs = ['original', 'review-copy', 'notes'];
+              for (const dir of requiredDirs) {
+                if (!fs.existsSync(path.join(folderPath, dir))) {
+                  throw new Error(`Missing required directory: ${dir}`);
+                }
+              }
+
+              const originalNotebook = fs.readdirSync(path.join(folderPath, 'original')).find(f => f.endsWith('.ipynb'));
+              if (!originalNotebook) {
+                throw new Error('Missing original notebook in original/.');
+              }
+              const reviewCopyNotebook = fs.readdirSync(path.join(folderPath, 'review-copy')).find(f => f.endsWith('_rvd.ipynb'));
+              if (!reviewCopyNotebook) {
+                throw new Error('Missing reviewed notebook in review-copy/.');
+              }
+
+              const requiredFiles = [
+                path.join('original', originalNotebook),
+                path.join('review-copy', reviewCopyNotebook),
+                path.join('notes', 'review_notes.md'),
+                'review_metadata.yml'
+              ];
+
+              for (const file of requiredFiles) {
+                if (!fs.existsSync(path.join(folderPath, file))) {
+                  throw new Error(`Missing required file: ${file}`);
+                }
+              }
+
+              const notesContent = fs.readFileSync(path.join(folderPath, 'notes', 'review_notes.md'), 'utf8');
+              const sectionNames = ['## Summary', '## Required Changes', '## Comments'];
+              const hasMeaningfulNotes = sectionNames.some((section) => {
+                const sectionIndex = notesContent.indexOf(section);
+                if (sectionIndex === -1) return false;
+                const afterSection = notesContent.slice(sectionIndex + section.length);
+                const nextHeadingIndex = afterSection.indexOf('##');
+                const sectionText = nextHeadingIndex === -1
+                  ? afterSection
+                  : afterSection.slice(0, nextHeadingIndex);
+                return sectionText.trim().length > 0;
+              });
+              if (!hasMeaningfulNotes) {
+                throw new Error('Review notes must include meaningful content under at least one of ## Summary, ## Required Changes, or ## Comments.');
+              }
+            };
+
+            const updateReviewMetadata = (metadataPath, updates) => {
+              let content = fs.readFileSync(metadataPath, 'utf8');
+              for (const [key, value] of Object.entries(updates)) {
+                const regex = new RegExp(`^\\s*${key}:.*$`, 'm');
+                const newLine = `${key}: ${value === null ? 'null' : `"${value}"`}`;
+                if (content.match(regex)) {
+                  content = content.replace(regex, newLine);
+                } else {
+                  content += `\n${newLine}`;
+                }
+              }
+              fs.writeFileSync(metadataPath, content);
+            };
+
             // Extract the tracked review item from issue body markers.
             const folderMatch = (issue.body || '').match(/<!--\s*folder:\s*(.+?)\s*-->/);
             const folder = folderMatch ? folderMatch[1] : null;
@@ -166,6 +284,26 @@ jobs:
                 } catch (err) {
                   await reply(`Could not move the tracked item into \`reviews/in-progress/\`: ${err.message}`);
                   return;
+                }
+                if (isFolderItem) {
+                  try {
+                    const metadataPath = path.join(activePath, 'review_metadata.yml');
+                    if (!fs.existsSync(metadataPath)) {
+                      const notebookPath = findSingleNotebook(activePath);
+                      createReviewStructure(activePath, notebookPath, commenter, issue.number);
+                      execFileSync('git', ['config', 'user.name', 'github-actions[bot]']);
+                      execFileSync('git', ['config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com']);
+                      execFileSync('git', ['add', '-A']);
+                      const pending = execFileSync('git', ['status', '--short']).toString().trim();
+                      if (pending) {
+                        execFileSync('git', ['commit', '-m', `Setup review structure for ${path.basename(activePath)} (refs #${issue.number})`]);
+                        execFileSync('git', ['push']);
+                      }
+                    }
+                  } catch (err) {
+                    await reply(`Review structure setup failed: ${err.message}`);
+                    return;
+                  }
                 }
                 await setLabels(['review-2-active'], ['awaiting-review-2', 'complete']);
                 const itemSummary = isFolderItem
@@ -221,6 +359,22 @@ jobs:
               if (reviewer1 && reviewer1 === commenter) {
                 await reply(`@${commenter} integrity check failed: you are recorded as the first reviewer.`);
                 return;
+              }
+              const activePath = trackedPath;
+              if (isFolderItem) {
+                try {
+                  validateReviewStructure(activePath);
+                  const metadataPath = path.join(activePath, 'review_metadata.yml');
+                  updateReviewMetadata(metadataPath, {
+                    status: 'completed',
+                    approval_timestamp: new Date().toISOString(),
+                    approved_by: commenter
+                  });
+                  await moveTrackedItemToStage(activePath, 'completed');
+                } catch (err) {
+                  await reply(`Approval validation failed: ${err.message}`);
+                  return;
+                }
               }
               await setLabels(['complete'], ['review-2-active']);
               await reply(`Approved by @${commenter}. The review is now marked complete. If this issue is linked to a tracked review folder or file and maintainer email settings are configured, the completion workflow will attempt finalization.`);
