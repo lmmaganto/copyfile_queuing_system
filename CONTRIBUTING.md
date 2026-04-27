@@ -211,17 +211,17 @@ gamma = 0.1
 Reviewer sees the dispute, checks p.12, and either reverts their change or adds more evidence with another `#CHANGED:` comment. They then comment `/approve` again to regenerate the diff report.
 
 ---
-
 ## Commands reference
 
 | Command | Who can use it | When | What happens |
 |---|---|---|---|
 | `/checkout` | Any reviewer | Issue is `awaiting-review-2` | Assigns you, moves files to in-progress, creates your notebook copy |
-| `/approve` | Assigned reviewer | Issue is `review-2-active` | Generates diff report, notifies curator, sets curator-review |
+| `/approve` | Assigned reviewer | Issue is `review-2-active` or `disputed` | Generates diff report, notifies curator, sets curator-review |
+| `/dispute reason` | Curator only | Issue is `curator-review` | Records dispute in curator_notes.md, notifies reviewer, sets disputed |
 | `/complete` | Curator only | Issue is `curator-review` | Moves to completed, closes issue |
 | `/release` | Assigned reviewer | Issue is `review-2-active` | Returns files to awaiting-review-2, unassigns you |
 
-> `/complete` can only be used by the curator of that paper. The system checks this automatically using `team_members.yml`. If your name is not in that file contact the repo maintainer.
+> `/dispute` requires a reason. Example: `/dispute gamma should be 0.14 not 0.1 — see supplementary table S2 p.12`
 ---
 
 ## If something goes wrong
