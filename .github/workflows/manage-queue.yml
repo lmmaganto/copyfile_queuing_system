@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   handle-command:
-    if: github.event.issue.state == 'open' && (startsWith(github.event.comment.body, '/checkout') || startsWith(github.event.comment.body, '/release') || startsWith(github.event.comment.body, '/approve') || startsWith(github.event.comment.body, '/complete'))
+    if: github.event.issue.state == 'open' && (startsWith(github.event.comment.body, '/checkout') || startsWith(github.event.comment.body, '/release') || startsWith(github.event.comment.body, '/approve') || startsWith(github.event.comment.body, '/complete') || startsWith(github.event.comment.body, '/dispute'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -59,6 +59,7 @@ jobs:
             const commenter = process.env.COMMENTER;
             const body = context.payload.comment.body.trim();
             const cmd  = body.split(/\s+/)[0];
+            const reason = body.replace(cmd, '').trim();
             const issue = context.payload.issue;
             const labels = issue.labels.map(l => l.name);
 
@@ -152,7 +153,6 @@ jobs:
               return null;
             };
 
-            // Extract the tracked review item from issue body markers
             const folderMatch = (issue.body || '').match(/<!--\s*folder:\s*(.+?)\s*-->/);
             const folder = folderMatch ? folderMatch[1] : null;
             const pathMatch = (issue.body || '').match(/<!--\s*path:\s*(.+?)\s*-->/);
@@ -162,7 +162,6 @@ jobs:
             const isFolderItem = !!trackedStat && trackedStat.isDirectory();
             const isFileItem = !!trackedStat && trackedStat.isFile();
 
-            // Read reviewer_1 from metadata if present
             let reviewer1 = null;
             if (folder && fs.existsSync(path.join(folder, 'metadata.yml'))) {
               const yml = fs.readFileSync(path.join(folder, 'metadata.yml'), 'utf8');
@@ -201,7 +200,6 @@ jobs:
                   return;
                 }
 
-                // Handle folder-based papers
                 if (isFolderItem) {
                   const metaPath = fs.existsSync(path.join(activePath, 'metadata.yml'))
                     ? path.join(activePath, 'metadata.yml')
@@ -227,7 +225,6 @@ jobs:
                   }
                 }
 
-                // Handle loose notebook files - convert to folder structure
                 if (isFileItem && activePath.endsWith('.ipynb')) {
                   const notebookName = path.basename(activePath);
                   const folderName = notebookName.replace('.ipynb', '');
@@ -238,8 +235,6 @@ jobs:
                   fs.copyFileSync(activePath, path.join(folderPath, 'original', notebookName));
                   const reviewName = notebookName.replace('.ipynb', '_rvd.ipynb');
                   fs.copyFileSync(activePath, path.join(folderPath, 'review-copy', reviewName));
-
-                  // Read curator name from notebook markdown cell
                   let curatorName = 'unknown';
                   try {
                     const nb = JSON.parse(fs.readFileSync(activePath, 'utf8'));
@@ -252,7 +247,6 @@ jobs:
                   } catch (e) {
                     console.log('Could not read curator from notebook:', e.message);
                   }
-
                   const metadata = 'paper_id: "' + folderName + '"\nstatus: "in-progress"\ncurator: "' + curatorName + '"\nreviewer: "' + commenter + '"\ncheckout_timestamp: "' + new Date().toISOString() + '"\noriginal_notebook: "' + notebookName + '"\nreview_copy_notebook: "' + reviewName + '"\napproval_timestamp: null\napproved_by: null\n';
                   fs.writeFileSync(path.join(folderPath, 'review_metadata.yml'), metadata);
                   fs.unlinkSync(activePath);
@@ -312,8 +306,8 @@ jobs:
 
             // ---------- /approve ----------
             if (cmd === '/approve') {
-              if (!labels.includes('review-2-active')) {
-                await reply('`/approve` is only valid during an active review (current: `' + labels.join(', ') + '`).');
+              if (!labels.includes('review-2-active') && !labels.includes('disputed')) {
+                await reply('`/approve` is only valid during an active or disputed review (current: `' + labels.join(', ') + '`).');
                 return;
               }
               const assignees = (issue.assignees || []).map(a => a.login);
@@ -326,7 +320,6 @@ jobs:
                 return;
               }
 
-              // Run diff report
               let diffSummary = '';
               let curatorGithub = null;
               if (isFolderItem && trackedPath) {
@@ -337,30 +330,23 @@ jobs:
                     meta = meta.replace(/^approval_timestamp:.*$/m, 'approval_timestamp: "' + new Date().toISOString() + '"');
                     meta = meta.replace(/^approved_by:.*$/m, 'approved_by: "' + commenter + '"');
                     fs.writeFileSync(metaPath, meta);
-
                     const result = execFileSync('python', [
                       'scripts/generate_diff_report.py',
                       trackedPath
                     ]).toString().trim();
-
                     console.log('Diff result:', result);
-
-                    // Extract curator github from script output
                     const curatorMatch = result.match(/curator_github:(.+)/);
                     if (curatorMatch) curatorGithub = curatorMatch[1].trim();
-
                     const reportPath = path.join(trackedPath, 'DIFF_REPORT.md');
                     if (fs.existsSync(reportPath)) {
                       const report = fs.readFileSync(reportPath, 'utf8');
                       const notifMatch = report.match(/## Curator notification\n([\s\S]*?)$/);
                       if (notifMatch) diffSummary = notifMatch[1].trim();
                     }
-
                     gitConfig();
                     execFileSync('git', ['add', trackedPath]);
                     execFileSync('git', ['commit', '-m', 'Diff report: ' + path.basename(trackedPath) + ' (refs #' + issue.number + ')']);
                     execFileSync('git', ['push']);
-
                   } catch (err) {
                     console.log('Diff report error:', err.message);
                     diffSummary = 'Diff report could not be generated - run manually with `python scripts/generate_diff_report.py ' + trackedPath + '`';
@@ -368,14 +354,68 @@ jobs:
                 }
               }
 
-              // Change label to curator-review — do not move to completed yet
-              await setLabels(['curator-review'], ['review-2-active']);
-
+              await setLabels(['curator-review'], ['review-2-active', 'disputed']);
               const approvalMsg = diffSummary
                 ? '@' + commenter + ' submitted their review.\n\n---\n\n' + diffSummary + '\n\nFull report: `' + trackedPath + '/DIFF_REPORT.md`'
                 : '@' + commenter + ' submitted their review. No diff report generated.';
-
               await reply(approvalMsg);
+              return;
+            }
+
+            // ---------- /dispute ----------
+            if (cmd === '/dispute') {
+              if (!labels.includes('curator-review')) {
+                await reply('`/dispute` is only valid after a reviewer has submitted their review (current: `' + labels.join(', ') + '`).');
+                return;
+              }
+
+              // Verify commenter is the curator
+              let curatorGithub = null;
+              if (isFolderItem && trackedPath) {
+                curatorGithub = resolveCurator(trackedPath);
+              }
+              if (curatorGithub && commenter !== curatorGithub) {
+                await reply('@' + commenter + ' only the curator (@' + curatorGithub + ') can dispute this review.');
+                return;
+              }
+
+              if (!reason) {
+                await reply('Please provide a reason for your dispute. Usage: `/dispute your reason here`');
+                return;
+              }
+
+              // Create or append to curator_notes.md
+              if (isFolderItem && trackedPath) {
+                const notesPath = path.join(trackedPath, 'curator_notes.md');
+                const now = new Date().toISOString();
+                const noteEntry = '\n## Dispute — ' + now + '\n**Curator:** @' + commenter + '\n**Reason:** ' + reason + '\n\n---\n';
+                if (fs.existsSync(notesPath)) {
+                  fs.appendFileSync(notesPath, noteEntry);
+                } else {
+                  const header = '# Curator notes\n\nThis file records curator disputes during the review process.\n\n---\n';
+                  fs.writeFileSync(notesPath, header + noteEntry);
+                }
+                gitConfig();
+                execFileSync('git', ['add', notesPath]);
+                execFileSync('git', ['commit', '-m', 'Dispute: curator notes updated (refs #' + issue.number + ')']);
+                execFileSync('git', ['push']);
+              }
+
+              // Find the reviewer to notify
+              let reviewerGithub = null;
+              if (isFolderItem && trackedPath) {
+                const metaPath = path.join(trackedPath, 'review_metadata.yml');
+                if (fs.existsSync(metaPath)) {
+                  const meta = fs.readFileSync(metaPath, 'utf8');
+                  const m = meta.match(/^reviewer:\s*(.+?)\s*$/m);
+                  if (m) reviewerGithub = m[1].trim();
+                }
+              }
+
+              await setLabels(['disputed'], ['curator-review']);
+              const disputeMsg = '**Dispute raised by @' + commenter + '**\n\n**Reason:** ' + reason + '\n\nThis has been recorded in `' + trackedPath + '/curator_notes.md`.\n\n' +
+                (reviewerGithub ? '@' + reviewerGithub + ' please review the curator\'s notes, update your notebook, and comment `/approve` again to regenerate the diff report.' : 'Reviewer please check the curator notes, update your notebook, and comment `/approve` again.');
+              await reply(disputeMsg);
               return;
             }
 
@@ -386,18 +426,15 @@ jobs:
                 return;
               }
 
-              // Verify commenter is the curator
               let curatorGithub = null;
               if (isFolderItem && trackedPath) {
                 curatorGithub = resolveCurator(trackedPath);
               }
-
               if (curatorGithub && commenter !== curatorGithub) {
                 await reply('@' + commenter + ' only the curator (@' + curatorGithub + ') can mark this complete.');
                 return;
               }
 
-              // Move to completed
               let completedPath = trackedPath;
               if (trackedPath && hasTrackedPath) {
                 try {
@@ -409,7 +446,6 @@ jobs:
                 }
               }
 
-              // Update metadata
               if (completedPath && fs.statSync(completedPath).isDirectory()) {
                 const metaPath = path.join(completedPath, 'review_metadata.yml');
                 if (fs.existsSync(metaPath)) {
@@ -423,7 +459,7 @@ jobs:
                 }
               }
 
-              await setLabels(['complete'], ['curator-review']);
+              await setLabels(['complete'], ['curator-review', 'disputed']);
               await github.rest.issues.update({
                 ...context.repo,
                 issue_number: issue.number,
